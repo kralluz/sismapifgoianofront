@@ -1,154 +1,49 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { MapPin, Navigation, Calendar, Clock, Users, Search, Filter, Zap, Book, FlaskConical, Utensils, Volume2, X, ChevronDown, Wifi, WifiOff, Edit3, Plus, Save, Trash2, Move, Route } from 'lucide-react';
+import React, {
+  useState, useRef, useEffect
+} from 'react';
+import type { MouseEvent } from 'react';
+import { MapPin, Navigation, Users, Search, Book, FlaskConical, Utensils, Volume2, X, ChevronDown, Wifi, WifiOff, Edit3, Save, Trash2, Route } from 'lucide-react';
+import campusMapData from './campusMapData.json';
+import type { Room, Event, RoomType, PathPoint, PopoverPosition } from './types';
+import {
+  createPathPoint
+} from './pathUtils';
 
-const CampusMapMVP = () => {
-  const [selectedRoom, setSelectedRoom] = useState(null);
-  const [selectedEvent, setSelectedEvent] = useState(null);
-  const [showPath, setShowPath] = useState(false);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [filterType, setFilterType] = useState('all');
-  const [isOnline, setIsOnline] = useState(true);
-  const [zoom, setZoom] = useState(1);
-  const [pan, setPan] = useState({ x: 0, y: 0 });
-  const [isDragging, setIsDragging] = useState(false);
-  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+const CampusMapMVP: React.FC = () => {
+  const [selectedRoom, setSelectedRoom] = useState<Room | null>(null);
+  const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
+  const [showPath, setShowPath] = useState<boolean>(false);
+  const [searchTerm, setSearchTerm] = useState<string>('');
+  const [filterType, setFilterType] = useState<string>('all');
+  const [isOnline, setIsOnline] = useState<boolean>(true);
+  const [zoom, setZoom] = useState<number>(1);
+  const [pan, setPan] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+  const [isDragging, setIsDragging] = useState<boolean>(false);
+  const [dragStart, setDragStart] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
 
   // Estados para modo de edição
-  const [isEditMode, setIsEditMode] = useState(false);
-  const [editingRoom, setEditingRoom] = useState(null);
-  const [isCreatingPath, setIsCreatingPath] = useState(false);
-  const [pathPoints, setPathPoints] = useState([]);
-  const [tempPathPoints, setTempPathPoints] = useState([]);
-  const [customRooms, setCustomRooms] = useState([]);
-  const [customPaths, setCustomPaths] = useState([]);
-  const [draggedRoom, setDraggedRoom] = useState(null);
-  const [showEditPanel, setShowEditPanel] = useState(false);
+  const [isEditMode, setIsEditMode] = useState<boolean>(false);
+  const [editingRoom, setEditingRoom] = useState<Room | null>(null);
+  const [isCreatingPath, setIsCreatingPath] = useState<boolean>(false);
+  const [tempPathPoints, setTempPathPoints] = useState<{ x: number; y: number }[]>([]);
+  const [showEditPanel, setShowEditPanel] = useState<boolean>(false);
+  const [userPathPoints, setUserPathPoints] = useState<{ x: number; y: number }[]>([]);
+  const [isPlacingUserPath, setIsPlacingUserPath] = useState<boolean>(false);
 
-  const mapRef = useRef(null);
+  const mapRef = useRef<SVGSVGElement | null>(null);
 
-  // Dados das salas (agora podem ser editados)
-  const [rooms, setRooms] = useState([
-    {
-      id: 'sala-101',
-      name: 'Sala 101',
-      x: 25,
-      y: 32,
-      description: 'Sala de Aula - Teoria',
-      capacity: 40,
-      type: 'classroom',
-      floor: 1,
-      building: 'A',
-      amenities: ['Projetor', 'Ar condicionado', 'Quadro inteligente'],
-      isCustom: false
-    },
-    {
-      id: 'lab-info-1',
-      name: 'Lab Informática I',
-      x: 68,
-      y: 28,
-      description: 'Laboratório de Programação',
-      capacity: 20,
-      type: 'lab',
-      floor: 1,
-      building: 'B',
-      amenities: ['20 PCs', 'Projetor', 'Rede gigabit'],
-      isCustom: false
-    },
-    {
-      id: 'biblioteca',
-      name: 'Biblioteca Central',
-      x: 45,
-      y: 65,
-      description: 'Acervo e Estudos',
-      capacity: 100,
-      type: 'library',
-      floor: 1,
-      building: 'C',
-      amenities: ['5000+ livros', 'Wi-Fi', 'Salas de estudo'],
-      isCustom: false
-    },
-    {
-      id: 'auditorio',
-      name: 'Auditório Principal',
-      x: 78,
-      y: 72,
-      description: 'Eventos e Palestras',
-      capacity: 200,
-      type: 'auditorium',
-      floor: 1,
-      building: 'D',
-      amenities: ['Sistema de som', 'Projeção 4K', 'Ar condicionado'],
-      isCustom: false
-    },
-    {
-      id: 'cantina',
-      name: 'Cantina Central',
-      x: 18,
-      y: 78,
-      description: 'Alimentação',
-      capacity: 80,
-      type: 'restaurant',
-      floor: 1,
-      building: 'E',
-      amenities: ['Refeitório', 'Lanchonete', 'Microondas'],
-      isCustom: false
-    }
-  ]);
+  // Dados das salas (carregados do JSON)
+  const [rooms, setRooms] = useState<Room[]>(campusMapData.map(room => ({
+    ...room,
+    type: room.type as RoomType
+  })));
 
-  // Eventos expandidos com mais variedade
-  const events = [
-    {
-      id: 1,
-      title: 'Palestra: O Futuro da IA',
-      room: 'auditorio',
-      time: '14:00 - 16:00',
-      date: '26/08/2025',
-      attendees: 150,
-      type: 'palestra',
-      status: 'confirmed',
-      speaker: 'Dr. Ana Silva',
-      priority: 'high'
-    },
-    {
-      id: 2,
-      title: 'Programação em Python',
-      room: 'lab-info-1',
-      time: '08:00 - 10:00',
-      date: '26/08/2025',
-      attendees: 20,
-      type: 'aula',
-      status: 'ongoing',
-      speaker: 'Prof. Carlos Santos',
-      priority: 'medium'
-    },
-    {
-      id: 3,
-      title: 'Reunião Pedagógica',
-      room: 'biblioteca',
-      time: '10:00 - 12:00',
-      date: '26/08/2025',
-      attendees: 12,
-      type: 'reuniao',
-      status: 'confirmed',
-      speaker: 'Coordenação',
-      priority: 'medium'
-    },
-    {
-      id: 4,
-      title: 'Workshop: Realidade Virtual',
-      room: 'biblioteca',
-      time: '16:00 - 18:00',
-      date: '26/08/2025',
-      attendees: 25,
-      type: 'workshop',
-      status: 'confirmed',
-      speaker: 'Tech Team',
-      priority: 'high'
-    }
-  ];
+
+
+
 
   // Função para obter ícone do tipo de sala
-  const getRoomIcon = (type) => {
+  const getRoomIcon = (type: RoomType) => {
     const icons = {
       classroom: Book,
       lab: FlaskConical,
@@ -161,9 +56,8 @@ const CampusMapMVP = () => {
   };
 
   // Função para obter cor do tipo de sala
-  const getRoomColor = (room, isSelected) => {
+  const getRoomColor = (room: Room, isSelected: boolean) => {
     if (isSelected) return "#ef4444";
-    if (room.isCustom) return "#8b5cf6";
     const colors = {
       classroom: "#3b82f6",
       lab: "#8b5cf6",
@@ -175,58 +69,30 @@ const CampusMapMVP = () => {
     return colors[room.type] || "#3b82f6";
   };
 
-  // Sistema de caminhos mais realista com múltiplas rotas
-  const getPathToRoom = (roomId) => {
-    // Primeiro verifica se existe um caminho customizado
-    const customPath = customPaths.find(path => path.roomId === roomId);
-    if (customPath) {
-      return customPath.points;
-    }
-
+  // Sistema de caminhos melhorado usando utilitários
+  const getPathToRoom = (roomId: string): PathPoint[] => {
     const room = rooms.find(r => r.id === roomId);
-    if (!room) return [];
+    if (!room || !room.path || room.path.length === 0) return [];
 
-    const entrance = { x: 10, y: 10 };
-    const destination = { x: room.x, y: room.y };
+    // Converter os pontos simples do JSON para PathPoint
+    return room.path.map((point, index) => {
+      let type: PathPoint['type'] = 'waypoint';
+      let label = '';
 
-    // Define pontos principais do sistema viário do campus
-    const mainNodes = {
-      entrance: { x: 10, y: 10 },
-      centralHub: { x: 50, y: 50 },
-      northGate: { x: 50, y: 15 },
-      southGate: { x: 50, y: 85 },
-      eastGate: { x: 85, y: 50 },
-      westGate: { x: 15, y: 50 }
-    };
+      if (index === 0) {
+        type = 'entrance';
+        label = 'Entrada Principal';
+      } else if (index === (room.path?.length || 0) - 1) {
+        type = 'destination';
+        label = room.name;
+      }
 
-    // Determina a melhor rota baseada na localização do destino
-    let pathPointsArray = [entrance];
-
-    // Conecta da entrada ao hub central passando pela via oeste
-    pathPointsArray.push(mainNodes.westGate);
-    pathPointsArray.push(mainNodes.centralHub);
-
-    // Escolhe a rota baseada na localização do destino
-    if (destination.x < 40 && destination.y < 50) {
-      pathPointsArray.push(mainNodes.northGate);
-    } else if (destination.x > 60 && destination.y < 50) {
-      pathPointsArray.push(mainNodes.northGate);
-      pathPointsArray.push(mainNodes.eastGate);
-    } else if (destination.x > 60 && destination.y > 50) {
-      pathPointsArray.push(mainNodes.eastGate);
-    } else if (destination.x < 40 && destination.y > 50) {
-      pathPointsArray.push(mainNodes.southGate);
-    }
-
-    // Adiciona pontos de aproximação ao destino
-    pathPointsArray.push({ x: destination.x, y: destination.y - 3 });
-    pathPointsArray.push(destination);
-
-    return pathPointsArray;
+      return createPathPoint(point[0], point[1], type, label);
+    });
   };
 
   // Função para calcular posição do popover sem sobreposição
-  const getPopoverPosition = (room) => {
+  const getPopoverPosition = (room: Room | null): PopoverPosition => {
     if (!room) return { top: '1rem', left: '1rem' };
 
     const mapContainer = mapRef.current?.getBoundingClientRect();
@@ -267,45 +133,58 @@ const CampusMapMVP = () => {
     };
   };
 
-  // Filtros aprimorados
-  const filteredEvents = events.filter(event => {
-    const matchesSearch = event.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      rooms.find(r => r.id === event.room)?.name.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesType = filterType === 'all' || event.type === filterType;
+  // Filtros aprimorados para salas
+  const filteredRooms = rooms.filter((room) => {
+    const matchesSearch = room.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      room.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      room.building.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesType = filterType === 'all' || room.type === filterType;
     return matchesSearch && matchesType;
   });
 
   // Funções de edição
-  const handleMapClick = (e) => {
+  const handleMapClick = (e: MouseEvent<SVGSVGElement>) => {
     if (!isEditMode) return;
 
-    const rect = mapRef.current.getBoundingClientRect();
-    const x = ((e.clientX - rect.left) / rect.width) * 100;
-    const y = ((e.clientY - rect.top) / rect.height) * 100;
+    const rect = mapRef.current?.getBoundingClientRect();
+    if (!rect) return;
 
-    if (isCreatingPath) {
-      setTempPathPoints(prev => [...prev, { x, y }]);
+    // Ajustar coordenadas considerando zoom e pan
+    const svgX = (e.clientX - rect.left - pan.x) / zoom;
+    const svgY = (e.clientY - rect.top - pan.y) / zoom;
+
+    // Converter para coordenadas relativas (0-100)
+    const x = (svgX / rect.width) * 100;
+    const y = (svgY / rect.height) * 100;
+
+    // Garantir que as coordenadas estejam dentro dos limites
+    const clampedX = Math.max(0, Math.min(100, x));
+    const clampedY = Math.max(0, Math.min(100, y));
+
+    if (isPlacingUserPath) {
+      setUserPathPoints(prev => [...prev, { x: clampedX, y: clampedY }]);
+    } else if (isCreatingPath) {
+      setTempPathPoints(prev => [...prev, { x: clampedX, y: clampedY }]);
     } else {
       // Criar novo local
-      const newRoom = {
+      const newRoom: Room = {
         id: `custom-${Date.now()}`,
         name: `Novo Local ${rooms.length + 1}`,
-        x,
-        y,
+        x: clampedX,
+        y: clampedY,
         description: 'Local personalizado',
         capacity: 20,
         type: 'classroom',
         floor: 1,
         building: 'X',
-        amenities: [],
-        isCustom: true
+        amenities: []
       };
       setRooms(prev => [...prev, newRoom]);
       setEditingRoom(newRoom);
     }
   };
 
-  const handleRoomClick = (room) => {
+  const handleRoomClick = (room: Room) => {
     if (isEditMode && !isCreatingPath) {
       setEditingRoom(room);
       setShowEditPanel(true);
@@ -313,32 +192,47 @@ const CampusMapMVP = () => {
     }
 
     if (isCreatingPath) {
+      // Verificar se temos pontos suficientes
+      if (tempPathPoints.length < 1) {
+        alert('Adicione pelo menos um ponto antes de finalizar o caminho clicando em uma sala.');
+        return;
+      }
+
       // Finalizar criação do caminho
-      const pathId = `path-${Date.now()}`;
-      const newPath = {
-        id: pathId,
-        roomId: room.id,
-        points: [...tempPathPoints, { x: room.x, y: room.y }]
-      };
-      setCustomPaths(prev => [...prev, newPath]);
+      const points: PathPoint[] = tempPathPoints.map((point, index) => {
+        let type: PathPoint['type'] = 'waypoint';
+        let label = '';
+
+        if (index === 0) {
+          type = 'entrance';
+          label = 'Entrada Principal';
+        } else if (index === tempPathPoints.length - 1) {
+          type = 'destination';
+          label = room.name;
+        }
+
+        return createPathPoint(point.x, point.y, type, label);
+      });
+
+      // Adiciona o ponto final da sala se não estiver incluído
+      if (tempPathPoints.length === 0 || tempPathPoints[tempPathPoints.length - 1].x !== room.x || tempPathPoints[tempPathPoints.length - 1].y !== room.y) {
+        points.push(createPathPoint(room.x, room.y, 'destination', room.name));
+      }
+
+      // Como não temos mais customPaths, apenas mostramos uma mensagem
+      alert(`Caminho para ${room.name} criado com sucesso!`);
       setTempPathPoints([]);
       setIsCreatingPath(false);
-      return;
     }
 
     setSelectedRoom(room);
     setSelectedEvent(null);
-    setShowPath(false);
+    setShowPath(true); // Alterado para true para exibir o caminho automaticamente
   };
 
-  const handleEventClick = (event) => {
-    const room = rooms.find(r => r.id === event.room);
-    setSelectedEvent(event);
-    setSelectedRoom(room);
-    setShowPath(true);
-  };
 
-  const saveRoomEdit = (updatedRoom) => {
+
+  const saveRoomEdit = (updatedRoom: Room) => {
     setRooms(prev => prev.map(room =>
       room.id === updatedRoom.id ? updatedRoom : room
     ));
@@ -346,17 +240,17 @@ const CampusMapMVP = () => {
     setShowEditPanel(false);
   };
 
-  const deleteRoom = (roomId) => {
+  const deleteRoom = (roomId: string) => {
     setRooms(prev => prev.filter(room => room.id !== roomId));
-    setCustomPaths(prev => prev.filter(path => path.roomId !== roomId));
     setEditingRoom(null);
     setShowEditPanel(false);
   };
 
-  const startPathCreation = (room) => {
+  const startPathCreation = () => {
     setIsCreatingPath(true);
-    setTempPathPoints([{ x: 10, y: 10 }]); // Começa da entrada
+    setTempPathPoints([]); // Começar com array vazio
     setSelectedRoom(null);
+    setShowEditPanel(false); // Fechar painel de edição se estiver aberto
   };
 
   const cancelPathCreation = () => {
@@ -364,17 +258,64 @@ const CampusMapMVP = () => {
     setTempPathPoints([]);
   };
 
+  // Validação em tempo real do caminho sendo criado
+  const validateCurrentPath = (points: { x: number; y: number }[]): { isValid: boolean; warnings: string[]; errors: string[] } => {
+    const warnings: string[] = [];
+    const errors: string[] = [];
+
+    // Só requerer 2 pontos se já começou a criar o caminho
+    if (points.length >= 1 && points.length < 2) {
+      // Não é erro, apenas aviso
+    } else if (points.length < 2 && points.length > 0) {
+      errors.push('Adicione pelo menos mais um ponto para criar um caminho válido');
+    }
+
+    // Verifica se os pontos estão muito próximos
+    for (let i = 0; i < points.length - 1; i++) {
+      const distance = Math.sqrt(
+        Math.pow(points[i + 1].x - points[i].x, 2) +
+        Math.pow(points[i + 1].y - points[i].y, 2)
+      );
+
+      if (distance < 3) { // Aumentei o limite para 3 unidades
+        warnings.push(`Pontos ${i + 1} e ${i + 2} estão muito próximos (${distance.toFixed(1)} unidades)`);
+      }
+    }
+
+    // Verifica se o caminho é muito longo
+    if (points.length > 15) { // Aumentei o limite
+      warnings.push('Caminho muito longo. Considere simplificar a rota');
+    }
+
+    // Verifica se há pontos fora dos limites
+    points.forEach((point, index) => {
+      if (point.x < 0 || point.x > 100 || point.y < 0 || point.y > 100) {
+        errors.push(`Ponto ${index + 1} está fora dos limites do mapa`);
+      }
+    });
+
+    return {
+      isValid: errors.length === 0,
+      warnings,
+      errors
+    };
+  };
+
+
+
+
+
   // Controles de zoom e pan
   const handleZoomIn = () => setZoom(prev => Math.min(prev * 1.2, 3));
   const handleZoomOut = () => setZoom(prev => Math.max(prev / 1.2, 0.5));
 
-  const handleMouseDown = (e) => {
+  const handleMouseDown = (e: MouseEvent<SVGSVGElement>) => {
     if (isEditMode) return; // Não permitir drag no modo de edição
     setIsDragging(true);
     setDragStart({ x: e.clientX - pan.x, y: e.clientY - pan.y });
   };
 
-  const handleMouseMove = (e) => {
+  const handleMouseMove = (e: MouseEvent<SVGSVGElement>) => {
     if (isDragging && !isEditMode) {
       setPan({ x: e.clientX - dragStart.x, y: e.clientY - dragStart.y });
     }
@@ -394,43 +335,19 @@ const CampusMapMVP = () => {
     };
   }, []);
 
-  const getEventTypeColor = (type, status) => {
-    const baseColors = {
-      palestra: 'border-blue-200 bg-blue-50',
-      aula: 'border-green-200 bg-green-50',
-      reuniao: 'border-purple-200 bg-purple-50',
-      laboratorio: 'border-orange-200 bg-orange-50',
-      workshop: 'border-pink-200 bg-pink-50',
-      estudo: 'border-gray-200 bg-gray-50'
-    };
 
-    if (status === 'ongoing') {
-      return 'border-yellow-300 bg-yellow-100 animate-pulse';
-    }
 
-    return baseColors[type] || 'border-gray-200 bg-gray-50';
-  };
 
-  const getStatusBadge = (status) => {
-    const badges = {
-      ongoing: 'bg-green-500 text-white animate-pulse',
-      confirmed: 'bg-blue-500 text-white',
-      cancelled: 'bg-red-500 text-white'
-    };
-    const labels = {
-      ongoing: 'Acontecendo',
-      confirmed: 'Confirmado',
-      cancelled: 'Cancelado'
-    };
-
-    return (
-      <span className={`px-2 py-1 rounded-full text-xs font-medium ${badges[status]}`}>
-        {labels[status]}
-      </span>
-    );
-  };
 
   const displayPathPoints = showPath && selectedRoom ? getPathToRoom(selectedRoom.id) : [];
+
+  // Debug: verificar se o caminho está sendo calculado
+  console.log('Debug caminho:', {
+    showPath,
+    selectedRoom: selectedRoom?.id,
+    displayPathPointsLength: displayPathPoints.length,
+    displayPathPoints
+  });
 
   return (
     <div className="h-screen flex flex-col bg-gradient-to-br from-blue-50 to-indigo-100">
@@ -445,9 +362,11 @@ const CampusMapMVP = () => {
             </h1>
             <p className="text-blue-100 text-sm">
               {isEditMode
-                ? isCreatingPath
-                  ? 'Clique no mapa para adicionar pontos do caminho, depois clique no destino'
-                  : 'Clique no mapa para adicionar locais ou clique em um local existente para editar'
+                ? isPlacingUserPath
+                  ? `Colocando pontos do caminho (${userPathPoints.length} pontos) - Clique no mapa para adicionar pontos. Clique nos pontos verdes para removê-los.`
+                  : isCreatingPath
+                    ? `Adicionando pontos do caminho (${tempPathPoints.length} pontos) - Clique no mapa para adicionar pontos, clique nos pontos amarelos para removê-los. Clique em uma sala para finalizar ou use o botão "Finalizar"`
+                    : 'Clique no mapa para adicionar locais, clique em locais para editar propriedades'
                 : 'Navegação inteligente e eventos em tempo real'
               }
             </p>
@@ -457,6 +376,7 @@ const CampusMapMVP = () => {
               {isOnline ? <Wifi className="w-4 h-4" /> : <WifiOff className="w-4 h-4" />}
               {isOnline ? 'Online' : 'Offline'}
             </div>
+
             <button
               onClick={() => {
                 setIsEditMode(!isEditMode);
@@ -464,6 +384,8 @@ const CampusMapMVP = () => {
                 setIsCreatingPath(false);
                 setTempPathPoints([]);
                 setShowEditPanel(false);
+                setIsPlacingUserPath(false);
+                setUserPathPoints([]);
               }}
               className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors ${isEditMode
                 ? 'bg-orange-500 hover:bg-orange-600'
@@ -473,6 +395,25 @@ const CampusMapMVP = () => {
               <Edit3 className="w-4 h-4" />
               {isEditMode ? 'Sair da Edição' : 'Editar Mapa'}
             </button>
+            {isEditMode && (
+              <>
+                <button
+                  onClick={() => {
+                    setIsPlacingUserPath(!isPlacingUserPath);
+                    if (!isPlacingUserPath) {
+                      setUserPathPoints([]);
+                    }
+                  }}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors ${isPlacingUserPath
+                    ? 'bg-green-500 hover:bg-green-600'
+                    : 'bg-blue-500 hover:bg-blue-600'
+                    } text-white`}
+                >
+                  <Route className="w-4 h-4" />
+                  {isPlacingUserPath ? 'Finalizar Caminho' : 'Colocar Caminho'}
+                </button>
+              </>
+            )}
           </div>
         </div>
       </div>
@@ -558,39 +499,7 @@ const CampusMapMVP = () => {
             <text x="16" y="11" fontSize="1.8" fill="#ef4444" className="font-bold">Entrada Principal</text>
           </g>
 
-          {/* Caminhos customizados */}
-          {customPaths.map((path, index) => (
-            <g key={path.id} id={`custom-path-${index}`}>
-              {path.points.map((point, pointIndex) => {
-                if (pointIndex === path.points.length - 1) return null;
-                const nextPoint = path.points[pointIndex + 1];
-                return (
-                  <line
-                    key={pointIndex}
-                    x1={point.x}
-                    y1={point.y}
-                    x2={nextPoint.x}
-                    y2={nextPoint.y}
-                    stroke="#8b5cf6"
-                    strokeWidth="1.5"
-                    strokeDasharray="4,2"
-                    opacity="0.8"
-                  />
-                );
-              })}
 
-              {path.points.map((point, pointIndex) => (
-                <circle
-                  key={`custom-point-${pointIndex}`}
-                  cx={point.x}
-                  cy={point.y}
-                  r="1"
-                  fill="#8b5cf6"
-                  opacity="0.8"
-                />
-              ))}
-            </g>
-          ))}
 
           {/* Caminho temporário durante criação */}
           {isCreatingPath && tempPathPoints.length > 0 && (
@@ -614,14 +523,86 @@ const CampusMapMVP = () => {
               })}
 
               {tempPathPoints.map((point, index) => (
-                <circle
-                  key={`temp-point-${index}`}
-                  cx={point.x}
-                  cy={point.y}
-                  r="1.5"
-                  fill="#f59e0b"
-                  className="animate-pulse"
-                />
+                <g key={`temp-point-${index}`}>
+                  <circle
+                    cx={point.x}
+                    cy={point.y}
+                    r="1.5"
+                    fill="#f59e0b"
+                    stroke="white"
+                    strokeWidth="0.5"
+                    className="animate-pulse cursor-pointer hover:fill-red-500"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setTempPathPoints(prev => prev.filter((_, i) => i !== index));
+                    }}
+                  />
+                  <text
+                    x={point.x}
+                    y={point.y - 2.5}
+                    fontSize="2"
+                    textAnchor="middle"
+                    fill="white"
+                    fontWeight="bold"
+                    className="pointer-events-none"
+                  >
+                    {index + 1}
+                  </text>
+                </g>
+              ))}
+            </g>
+          )}
+
+          {/* Caminho do usuário */}
+          {userPathPoints.length > 0 && (
+            <g id="user-path">
+              {userPathPoints.map((point, index) => {
+                if (index === userPathPoints.length - 1) return null;
+                const nextPoint = userPathPoints[index + 1];
+                return (
+                  <line
+                    key={index}
+                    x1={point.x}
+                    y1={point.y}
+                    x2={nextPoint.x}
+                    y2={nextPoint.y}
+                    stroke="#10b981"
+                    strokeWidth="2"
+                    strokeDasharray="5,2"
+                    className="animate-pulse"
+                  />
+                );
+              })}
+
+              {userPathPoints.map((point, index) => (
+                <g key={`user-point-${index}`}>
+                  <circle
+                    cx={point.x}
+                    cy={point.y}
+                    r="1.5"
+                    fill="#10b981"
+                    stroke="white"
+                    strokeWidth="0.5"
+                    className="cursor-pointer hover:fill-red-500"
+                    onClick={(e) => {
+                      if (isPlacingUserPath) {
+                        e.stopPropagation();
+                        setUserPathPoints(prev => prev.filter((_, i) => i !== index));
+                      }
+                    }}
+                  />
+                  <text
+                    x={point.x}
+                    y={point.y - 2.5}
+                    fontSize="2"
+                    textAnchor="middle"
+                    fill="white"
+                    fontWeight="bold"
+                    className="pointer-events-none"
+                  >
+                    {index + 1}
+                  </text>
+                </g>
               ))}
             </g>
           )}
@@ -779,7 +760,7 @@ const CampusMapMVP = () => {
             {selectedEvent && (
               <div className="border-t pt-3">
                 <div className="flex items-center gap-2 mb-2">
-                  <Zap className="w-4 h-4 text-green-600" />
+                  <span className="text-green-600">📅</span>
                   <span className="font-semibold text-sm text-gray-900">Evento Atual:</span>
                 </div>
                 <div className="bg-gradient-to-r from-green-50 to-blue-50 p-3 rounded-lg">
@@ -787,8 +768,8 @@ const CampusMapMVP = () => {
                   <p className="text-xs text-gray-600 mb-1">📅 {selectedEvent.time} - {selectedEvent.date}</p>
                   <p className="text-xs text-gray-600 mb-2">👨‍🏫 {selectedEvent.speaker}</p>
                   <div className="flex items-center justify-between">
-                    {getStatusBadge(selectedEvent.status)}
-                    <span className="text-xs text-gray-500">👥 {selectedEvent.attendees} participantes</span>
+                    <span className="text-xs text-gray-500">Status: {selectedEvent?.status || 'N/A'}</span>
+                    <span className="text-xs text-gray-500">👥 {selectedEvent?.attendees || 0} participantes</span>
                   </div>
                 </div>
               </div>
@@ -825,21 +806,91 @@ const CampusMapMVP = () => {
         {/* Controles de navegação aprimorados */}
         <div className="absolute bottom-4 right-4 flex flex-col gap-2">
           {isCreatingPath && (
-            <div className="bg-orange-500 text-white p-3 rounded-lg mb-2 shadow-lg">
-              <div className="flex items-center gap-2 mb-2">
-                <Route className="w-4 h-4" />
-                <span className="font-medium text-sm">Criando Caminho</span>
+            <div className="bg-orange-500 text-white p-4 rounded-lg mb-2 shadow-lg max-w-xs">
+              <div className="flex items-center gap-2 mb-3">
+                <Route className="w-5 h-5" />
+                <span className="font-bold text-sm">Criando Caminho</span>
               </div>
+
+              <div className="space-y-2 mb-3">
+                <div className="text-xs text-orange-100">
+                  Pontos adicionados: {tempPathPoints.length}
+                </div>
+                {tempPathPoints.length > 0 && (
+                  <div className="text-xs bg-orange-600/50 p-2 rounded">
+                    Último ponto: ({tempPathPoints[tempPathPoints.length - 1].x.toFixed(1)}, {tempPathPoints[tempPathPoints.length - 1].y.toFixed(1)})
+                  </div>
+                )}
+
+                {/* Validação em tempo real */}
+                {(() => {
+                  const validation = validateCurrentPath(tempPathPoints);
+                  return (
+                    <div className="space-y-1">
+                      {validation.errors.length === 0 && tempPathPoints.length === 0 && (
+                        <div className="text-xs text-blue-200 bg-blue-600/50 p-1 rounded">
+                          💡 Clique no mapa para começar a adicionar pontos do caminho
+                        </div>
+                      )}
+                      {validation.errors.map((error, index) => (
+                        <div key={index} className="text-xs text-red-200 bg-red-600/50 p-1 rounded">
+                          ⚠️ {error}
+                        </div>
+                      ))}
+                      {validation.warnings.map((warning, index) => (
+                        <div key={index} className="text-xs text-yellow-200 bg-yellow-600/50 p-1 rounded">
+                          ⚡ {warning}
+                        </div>
+                      ))}
+                      {validation.isValid && tempPathPoints.length >= 2 && (
+                        <div className="text-xs text-green-200 bg-green-600/50 p-1 rounded">
+                          ✅ Pronto! Clique em uma sala para finalizar ou use o botão "Finalizar"
+                        </div>
+                      )}
+                      {validation.isValid && tempPathPoints.length === 1 && (
+                        <div className="text-xs text-blue-200 bg-blue-600/50 p-1 rounded">
+                          📍 Adicione mais pontos ou clique em uma sala para finalizar
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
+              </div>
+
               <div className="flex gap-2">
                 <button
-                  onClick={cancelPathCreation}
+                  onClick={() => {
+                    if (tempPathPoints.length >= 2) {
+                      // Como não temos mais customPaths, apenas mostramos uma mensagem
+                      alert(`Caminho criado com sucesso!`);
+                      setTempPathPoints([]);
+                      setIsCreatingPath(false);
+                    }
+                  }}
+                  disabled={tempPathPoints.length < 2}
+                  className="bg-green-600 hover:bg-green-700 disabled:bg-gray-600 px-3 py-1 rounded text-xs font-medium transition-colors"
+                  title="Finalizar caminho personalizado"
+                >
+                  Finalizar
+                </button>
+                <button
+                  onClick={() => setTempPathPoints([])}
                   className="bg-white/20 hover:bg-white/30 px-3 py-1 rounded text-xs font-medium transition-colors"
+                  title="Limpar todos os pontos"
+                >
+                  Limpar
+                </button>
+                <button
+                  onClick={cancelPathCreation}
+                  className="bg-red-600 hover:bg-red-700 px-3 py-1 rounded text-xs font-medium transition-colors"
                 >
                   Cancelar
                 </button>
               </div>
             </div>
           )}
+
+
 
           <button
             onClick={handleZoomIn}
@@ -876,15 +927,15 @@ const CampusMapMVP = () => {
         </div>
       </div>
 
-      {/* Lista de Eventos aprimorada - 40% da tela */}
+      {/* Lista de Salas - 40% da tela */}
       <div className="h-2/5 bg-white border-t border-gray-200 overflow-hidden flex flex-col">
         <div className="p-4 border-b bg-gradient-to-r from-gray-50 to-blue-50">
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-              <Calendar className="w-5 h-5" />
-              Eventos de Hoje
+              <MapPin className="w-5 h-5" />
+              Locais do Campus
               <span className="bg-blue-500 text-white text-xs px-2 py-1 rounded-full ml-2">
-                {filteredEvents.length}
+                {filteredRooms.length}
               </span>
             </h2>
           </div>
@@ -895,7 +946,7 @@ const CampusMapMVP = () => {
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
               <input
                 type="text"
-                placeholder="Buscar eventos ou salas..."
+                placeholder="Buscar salas..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -908,12 +959,12 @@ const CampusMapMVP = () => {
                 className="appearance-none bg-white border border-gray-300 rounded-lg px-4 py-2 pr-8 focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 <option value="all">Todos</option>
-                <option value="aula">Aulas</option>
-                <option value="palestra">Palestras</option>
-                <option value="reuniao">Reuniões</option>
-                <option value="laboratorio">Laboratórios</option>
-                <option value="workshop">Workshops</option>
-                <option value="estudo">Estudos</option>
+                <option value="classroom">Salas de Aula</option>
+                <option value="lab">Laboratórios</option>
+                <option value="library">Biblioteca</option>
+                <option value="auditorium">Auditório</option>
+                <option value="restaurant">Cantina</option>
+                <option value="office">Escritório</option>
               </select>
               <ChevronDown className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4 pointer-events-none" />
             </div>
@@ -922,94 +973,101 @@ const CampusMapMVP = () => {
 
         <div className="flex-1 overflow-y-auto">
           <div className="p-4 space-y-3">
-            {filteredEvents.length === 0 ? (
+            {filteredRooms.length === 0 ? (
               <div className="text-center py-8 text-gray-500">
                 <Search className="w-12 h-12 mx-auto mb-3 text-gray-300" />
-                <p className="text-lg font-medium">Nenhum evento encontrado</p>
+                <p className="text-lg font-medium">Nenhuma sala encontrada</p>
                 <p className="text-sm">Tente ajustar sua busca ou filtros</p>
               </div>
             ) : (
-              filteredEvents.map((event) => {
-                const room = rooms.find(r => r.id === event.room);
-                const isSelected = selectedEvent?.id === event.id;
+              filteredRooms.map((room) => {
+                const isSelected = selectedRoom?.id === room.id;
 
                 return (
                   <div
-                    key={event.id}
-                    onClick={() => handleEventClick(event)}
+                    key={room.id}
+                    onClick={() => handleRoomClick(room)}
                     className={`p-4 rounded-xl border cursor-pointer transition-all duration-200 hover:shadow-lg transform hover:-translate-y-1 ${isSelected
                       ? 'border-blue-500 bg-blue-50 shadow-lg ring-2 ring-blue-200'
-                      : `${getEventTypeColor(event.type, event.status)} hover:shadow-md`
+                      : 'border-gray-200 bg-white hover:shadow-md'
                       }`}
                   >
                     <div className="flex items-start justify-between mb-3">
                       <div className="flex-1">
                         <div className="flex items-center gap-2 mb-1">
-                          <h3 className="font-bold text-gray-900">{event.title}</h3>
-                          {event.priority === 'high' && (
-                            <span className="bg-red-100 text-red-800 text-xs px-2 py-1 rounded-full font-medium">
-                              Alta Prioridade
-                            </span>
-                          )}
+                          {React.createElement(getRoomIcon(room.type), { className: "w-5 h-5 text-blue-600" })}
+                          <h3 className="font-bold text-gray-900">{room.name}</h3>
                         </div>
-                        <p className="text-sm text-gray-600 mb-2">Por: {event.speaker}</p>
+                        <p className="text-sm text-gray-600 mb-2">{room.description}</p>
 
                         <div className="grid grid-cols-2 gap-4 text-sm text-gray-600">
                           <div className="flex items-center gap-2">
-                            <Clock className="w-4 h-4 text-blue-500" />
-                            <span className="font-medium">{event.time}</span>
+                            <Users className="w-4 h-4 text-purple-500" />
+                            <span>{room.capacity} pessoas</span>
                           </div>
                           <div className="flex items-center gap-2">
                             <MapPin className="w-4 h-4 text-green-500" />
-                            <span className="font-medium">{room?.name}</span>
+                            <span>Prédio {room.building}</span>
                           </div>
                           <div className="flex items-center gap-2">
-                            <Users className="w-4 h-4 text-purple-500" />
-                            <span>{event.attendees} pessoas</span>
+                            <span className="text-xs">🏢</span>
+                            <span>{room.floor}º Andar</span>
                           </div>
                           <div className="flex items-center gap-2">
-                            {room && React.createElement(getRoomIcon(room.type), { className: "w-4 h-4 text-orange-500" })}
-                            <span>Prédio {room?.building}</span>
+                            <span className="text-xs">📍</span>
+                            <span>({room.x.toFixed(1)}, {room.y.toFixed(1)})</span>
                           </div>
                         </div>
                       </div>
 
                       <div className="flex flex-col items-end gap-2 ml-4">
-                        {getStatusBadge(event.status)}
                         <div className="text-right">
-                          <div className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium capitalize ${event.type === 'palestra' ? 'bg-blue-100 text-blue-800' :
-                            event.type === 'aula' ? 'bg-green-100 text-green-800' :
-                              event.type === 'reuniao' ? 'bg-purple-100 text-purple-800' :
-                                event.type === 'laboratorio' ? 'bg-orange-100 text-orange-800' :
-                                  event.type === 'workshop' ? 'bg-pink-100 text-pink-800' :
+                          <div className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium capitalize ${room.type === 'classroom' ? 'bg-blue-100 text-blue-800' :
+                            room.type === 'lab' ? 'bg-purple-100 text-purple-800' :
+                              room.type === 'library' ? 'bg-green-100 text-green-800' :
+                                room.type === 'auditorium' ? 'bg-orange-100 text-orange-800' :
+                                  room.type === 'restaurant' ? 'bg-red-100 text-red-800' :
                                     'bg-gray-100 text-gray-800'
                             }`}>
-                            {event.type}
+                            {room.type === 'classroom' ? 'Sala de Aula' :
+                             room.type === 'lab' ? 'Laboratório' :
+                             room.type === 'library' ? 'Biblioteca' :
+                             room.type === 'auditorium' ? 'Auditório' :
+                             room.type === 'restaurant' ? 'Cantina' : 'Escritório'}
                           </div>
                         </div>
                       </div>
                     </div>
 
-                    {/* Barra de progresso para eventos em andamento */}
-                    {event.status === 'ongoing' && (
-                      <div className="mt-3">
-                        <div className="flex items-center justify-between text-xs text-gray-600 mb-1">
-                          <span>Em andamento</span>
-                          <span>45% concluído</span>
-                        </div>
-                        <div className="w-full bg-gray-200 rounded-full h-1.5">
-                          <div className="bg-green-500 h-1.5 rounded-full animate-pulse" style={{ width: '45%' }}></div>
+                    {/* Recursos disponíveis */}
+                    {room.amenities && room.amenities.length > 0 && (
+                      <div className="mb-3">
+                        <div className="flex flex-wrap gap-1">
+                          {room.amenities.map((amenity, index) => (
+                            <span key={index} className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full font-medium">
+                              {amenity}
+                            </span>
+                          ))}
                         </div>
                       </div>
                     )}
 
-                    {/* Indicador de distância */}
+                    {/* Indicador de caminho disponível */}
+                    {room.path && room.path.length > 0 && (
+                      <div className="mt-3 pt-3 border-t border-gray-200">
+                        <div className="flex items-center gap-2 text-sm text-green-600">
+                          <Navigation className="w-4 h-4" />
+                          <span className="font-medium">Caminho disponível - {room.path.length} pontos</span>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Indicador de seleção */}
                     {isSelected && (
                       <div className="mt-3 pt-3 border-t border-gray-200">
                         <div className="flex items-center gap-2 text-sm text-blue-600">
-                          <Navigation className="w-4 h-4" />
-                          <span className="font-medium">Rota calculada - {Math.floor(Math.random() * 150 + 50)}m</span>
-                          <span className="text-xs text-gray-500">~2 min caminhando</span>
+                          <span className="w-2 h-2 bg-blue-500 rounded-full"></span>
+                          <span className="font-medium">Sala selecionada</span>
                         </div>
                       </div>
                     )}
@@ -1025,20 +1083,20 @@ const CampusMapMVP = () => {
           <div className="flex items-center justify-between text-sm text-gray-600">
             <div className="flex items-center gap-4">
               <span className="flex items-center gap-1">
-                <div className="w-2 h-2 rounded-full bg-green-500"></div>
-                {events.filter(e => e.status === 'ongoing').length} Em andamento
-              </span>
-              <span className="flex items-center gap-1">
                 <div className="w-2 h-2 rounded-full bg-blue-500"></div>
-                {events.filter(e => e.status === 'confirmed').length} Confirmados
+                {rooms.filter(r => r.type === 'classroom').length} Salas de Aula
               </span>
               <span className="flex items-center gap-1">
-                <div className="w-2 h-2 rounded-full bg-red-500"></div>
-                {events.filter(e => e.priority === 'high').length} Alta prioridade
+                <div className="w-2 h-2 rounded-full bg-purple-500"></div>
+                {rooms.filter(r => r.type === 'lab').length} Laboratórios
+              </span>
+              <span className="flex items-center gap-1">
+                <div className="w-2 h-2 rounded-full bg-green-500"></div>
+                {rooms.filter(r => r.type === 'library').length} Bibliotecas
               </span>
             </div>
             <div className="text-xs text-gray-400">
-              Última atualização: agora
+              Total: {rooms.length} locais
             </div>
           </div>
         </div>
@@ -1048,10 +1106,18 @@ const CampusMapMVP = () => {
 };
 
 // Componente do Painel de Edição
-const EditRoomPanel = ({ room, onSave, onDelete, onCancel, onStartPath }) => {
-  const [editedRoom, setEditedRoom] = useState({ ...room });
+interface EditRoomPanelProps {
+  room: Room;
+  onSave: (room: Room) => void;
+  onDelete: (roomId: string) => void;
+  onCancel: () => void;
+  onStartPath: (room: Room) => void;
+}
 
-  const handleSubmit = (e) => {
+const EditRoomPanel: React.FC<EditRoomPanelProps> = ({ room, onSave, onDelete, onCancel, onStartPath }) => {
+  const [editedRoom, setEditedRoom] = useState<Room>({ ...room });
+
+  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     onSave(editedRoom);
   };
@@ -1086,7 +1152,7 @@ const EditRoomPanel = ({ room, onSave, onDelete, onCancel, onStartPath }) => {
             value={editedRoom.description}
             onChange={(e) => setEditedRoom({ ...editedRoom, description: e.target.value })}
             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-            rows="2"
+            rows={2}
           />
         </div>
 
@@ -1095,7 +1161,7 @@ const EditRoomPanel = ({ room, onSave, onDelete, onCancel, onStartPath }) => {
             <label className="block text-sm font-medium text-gray-700 mb-1">Tipo</label>
             <select
               value={editedRoom.type}
-              onChange={(e) => setEditedRoom({ ...editedRoom, type: e.target.value })}
+              onChange={(e) => setEditedRoom({ ...editedRoom, type: e.target.value as RoomType })}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="classroom">Sala de Aula</option>
@@ -1112,9 +1178,9 @@ const EditRoomPanel = ({ room, onSave, onDelete, onCancel, onStartPath }) => {
             <input
               type="number"
               value={editedRoom.capacity}
-              onChange={(e) => setEditedRoom({ ...editedRoom, capacity: parseInt(e.target.value) })}
+              onChange={(e) => setEditedRoom({ ...editedRoom, capacity: parseInt(e.target.value) || 1 })}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              min="1"
+              min={1}
             />
           </div>
         </div>
@@ -1127,7 +1193,7 @@ const EditRoomPanel = ({ room, onSave, onDelete, onCancel, onStartPath }) => {
               value={editedRoom.building}
               onChange={(e) => setEditedRoom({ ...editedRoom, building: e.target.value })}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              maxLength="1"
+              maxLength={1}
             />
           </div>
 
@@ -1136,9 +1202,9 @@ const EditRoomPanel = ({ room, onSave, onDelete, onCancel, onStartPath }) => {
             <input
               type="number"
               value={editedRoom.floor}
-              onChange={(e) => setEditedRoom({ ...editedRoom, floor: parseInt(e.target.value) })}
+              onChange={(e) => setEditedRoom({ ...editedRoom, floor: parseInt(e.target.value) || 1 })}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              min="1"
+              min={1}
             />
           </div>
         </div>
@@ -1176,16 +1242,14 @@ const EditRoomPanel = ({ room, onSave, onDelete, onCancel, onStartPath }) => {
             Caminho
           </button>
 
-          {room.isCustom && (
-            <button
-              type="button"
-              onClick={() => onDelete(room.id)}
-              className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors flex items-center gap-2"
-              title="Excluir local"
-            >
-              <Trash2 className="w-4 h-4" />
-            </button>
-          )}
+          <button
+            type="button"
+            onClick={() => onDelete(room.id)}
+            className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors flex items-center gap-2"
+            title="Excluir local"
+          >
+            <Trash2 className="w-4 h-4" />
+          </button>
         </div>
       </form>
     </div>

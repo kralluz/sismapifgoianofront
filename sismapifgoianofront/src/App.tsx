@@ -1,4 +1,3 @@
-import { useState } from 'react'
 import CampusMapMVP from './CampusMap'
 import './App.css'
 
