@@ -441,7 +441,7 @@ const CampusMapMVP: React.FC = () => {
       </div>
 
       {/* Mapa Container aprimorado - 60% da tela */}
-      <div className="flex-1 relative bg-gradient-to-br from-green-100 to-emerald-200 overflow-hidden" style={{ minHeight: '60vh' }}>
+      <div className="flex-1 relative bg-gray-100 overflow-hidden" style={{ minHeight: '60vh' }}>
         <svg
           ref={mapRef}
           className={`w-full h-full select-none ${isEditMode ? 'cursor-crosshair' : isDragging ? 'cursor-grabbing' : 'cursor-grab'
@@ -457,69 +457,10 @@ const CampusMapMVP: React.FC = () => {
             transform: `scale(${zoom}) translate(${pan.x / zoom}px, ${pan.y / zoom}px)`
           }}
         >
-          {/* Fundo do campus mais detalhado */}
-          <defs>
-            <pattern id="grass" patternUnits="userSpaceOnUse" width="4" height="4">
-              <rect width="4" height="4" fill="#dcfce7" />
-              <circle cx="1" cy="1" r="0.2" fill="#bbf7d0" opacity="0.5" />
-              <circle cx="3" cy="3" r="0.2" fill="#bbf7d0" opacity="0.5" />
-            </pattern>
-            <linearGradient id="buildingGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-              <stop offset="0%" style={{ stopColor: "#f3f4f6", stopOpacity: 1 }} />
-              <stop offset="100%" style={{ stopColor: "#d1d5db", stopOpacity: 1 }} />
-            </linearGradient>
-          </defs>
+          {/* Imagem do mapa como fundo */}
+          <image href="/mapa/mapa.png" x="0" y="0" width="100" height="100" preserveAspectRatio="xMidYMid meet" />
 
-          <rect width="100" height="100" fill="url(#grass)" />
 
-          {/* Sistema viário completo do campus */}
-          <g id="road-system">
-            {/* Via Principal Horizontal */}
-            <rect x="5" y="48" width="90" height="4" fill="#6b7280" opacity="0.8" rx="2" />
-            <rect x="5" y="49" width="90" height="2" fill="#9ca3af" opacity="0.6" rx="1" />
-
-            {/* Via Principal Vertical */}
-            <rect x="48" y="5" width="4" height="90" fill="#6b7280" opacity="0.8" rx="2" />
-            <rect x="49" y="5" width="2" height="90" fill="#9ca3af" opacity="0.6" rx="1" />
-
-            {/* Vias Secundárias */}
-            <rect x="23" y="15" width="3" height="70" fill="#9ca3af" opacity="0.7" rx="1.5" />
-            <rect x="24" y="15" width="1" height="70" fill="#d1d5db" opacity="0.5" rx="0.5" />
-
-            <rect x="74" y="20" width="3" height="65" fill="#9ca3af" opacity="0.7" rx="1.5" />
-            <rect x="75" y="20" width="1" height="65" fill="#d1d5db" opacity="0.5" rx="0.5" />
-
-            <rect x="25" y="23" width="50" height="3" fill="#9ca3af" opacity="0.7" rx="1.5" />
-            <rect x="25" y="24" width="50" height="1" fill="#d1d5db" opacity="0.5" rx="0.5" />
-
-            <rect x="20" y="73" width="65" height="3" fill="#9ca3af" opacity="0.7" rx="1.5" />
-            <rect x="20" y="74" width="65" height="1" fill="#d1d5db" opacity="0.5" rx="0.5" />
-          </g>
-
-          {/* Prédios com mais detalhes */}
-          <g id="buildings">
-            <rect x="15" y="20" width="25" height="25" fill="url(#buildingGrad)" stroke="#6b7280" strokeWidth="0.3" rx="1" />
-            <text x="27.5" y="33" fontSize="2.5" textAnchor="middle" fill="#374151" className="font-bold">A</text>
-
-            <rect x="60" y="15" width="25" height="35" fill="url(#buildingGrad)" stroke="#6b7280" strokeWidth="0.3" rx="1" />
-            <text x="72.5" y="33" fontSize="2.5" textAnchor="middle" fill="#374151" className="font-bold">B</text>
-
-            <rect x="35" y="55" width="30" height="25" fill="url(#buildingGrad)" stroke="#6b7280" strokeWidth="0.3" rx="1" />
-            <text x="50" y="68" fontSize="2.5" textAnchor="middle" fill="#374151" className="font-bold">C</text>
-
-            <rect x="70" y="60" width="20" height="25" fill="url(#buildingGrad)" stroke="#6b7280" strokeWidth="0.3" rx="1" />
-            <text x="80" y="73" fontSize="2.5" textAnchor="middle" fill="#374151" className="font-bold">D</text>
-
-            <rect x="10" y="70" width="20" height="15" fill="url(#buildingGrad)" stroke="#6b7280" strokeWidth="0.3" rx="1" />
-            <text x="20" y="78" fontSize="2.5" textAnchor="middle" fill="#374151" className="font-bold">E</text>
-          </g>
-
-          {/* Entrada principal */}
-          <g id="entrance">
-            <rect x="7" y="7" width="6" height="6" fill="#ef4444" rx="1" stroke="white" strokeWidth="0.3" />
-            <text x="10" y="10.5" fontSize="1.5" textAnchor="middle" fill="white" className="font-bold">🚪</text>
-            <text x="16" y="11" fontSize="1.8" fill="#ef4444" className="font-bold">Entrada Principal</text>
-          </g>
 
 
 
