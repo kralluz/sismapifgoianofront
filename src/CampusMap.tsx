@@ -8,6 +8,7 @@ import type { Room, Event, RoomType, PathPoint, PopoverPosition } from './types'
 import {
   createPathPoint
 } from './pathUtils';
+import { useOfflineCache } from './hooks/useOfflineCache';
 
 const CampusMapMVP: React.FC = () => {
   const [selectedRoom, setSelectedRoom] = useState<Room | null>(null);
@@ -15,7 +16,9 @@ const CampusMapMVP: React.FC = () => {
   const [showPath, setShowPath] = useState<boolean>(false);
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [filterType, setFilterType] = useState<string>('all');
-  const [isOnline, setIsOnline] = useState<boolean>(true);
+  
+  // Hook de cache offline
+  const { isOnline, cacheData, saveToCache, loadFromCache } = useOfflineCache();
   const [zoom, setZoom] = useState<number>(1);
   const [pan, setPan] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState<boolean>(false);
@@ -32,11 +35,30 @@ const CampusMapMVP: React.FC = () => {
 
   const mapRef = useRef<SVGSVGElement | null>(null);
 
-  // Dados das salas (carregados do JSON)
-  const [rooms, setRooms] = useState<Room[]>(campusMapData.map(room => ({
-    ...room,
-    type: room.type as RoomType
-  })));
+  // Dados das salas (carregados do JSON ou cache)
+  const [rooms, setRooms] = useState<Room[]>(() => {
+    // Tentar carregar do cache primeiro se offline
+    if (!isOnline && cacheData?.mapData) {
+      return cacheData.mapData;
+    }
+    return campusMapData.map(room => ({
+      ...room,
+      type: room.type as RoomType
+    }));
+  });
+
+  // Salvar dados no cache quando online
+  useEffect(() => {
+    if (isOnline && rooms.length > 0) {
+      saveToCache({
+        mapData: rooms,
+        routes: rooms.filter(r => r.path && r.path.length > 0).map(r => ({
+          roomId: r.id,
+          path: r.path
+        }))
+      });
+    }
+  }, [isOnline, rooms, saveToCache]);
 
 
 
@@ -325,15 +347,15 @@ const CampusMapMVP: React.FC = () => {
     setIsDragging(false);
   };
 
+  // Carregar dados do cache ao inicializar se offline
   useEffect(() => {
-    const handleOnlineStatus = () => setIsOnline(navigator.onLine);
-    window.addEventListener('online', handleOnlineStatus);
-    window.addEventListener('offline', handleOnlineStatus);
-    return () => {
-      window.removeEventListener('online', handleOnlineStatus);
-      window.removeEventListener('offline', handleOnlineStatus);
-    };
-  }, []);
+    if (!isOnline) {
+      const cachedData = loadFromCache();
+      if (cachedData?.mapData) {
+        setRooms(cachedData.mapData);
+      }
+    }
+  }, [isOnline, loadFromCache]);
 
 
 

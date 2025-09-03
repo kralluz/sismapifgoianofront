@@ -1,0 +1,17 @@
+{
+  "name": "SisMap IF Goiano",
+  "short_name": "SisMap",
+  "description": "Sistema de Mapa Interativo do Campus IF Goiano",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#2563eb",
+  "icons": [
+    {
+      "src": "/vite.svg",
+      "sizes": "192x192",
+      "type": "image/svg+xml"
+    }
+  ],
+  "offline_fallback": "/index.html"
+}
