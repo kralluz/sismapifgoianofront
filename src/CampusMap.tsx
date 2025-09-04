@@ -1,6 +1,4 @@
-import React, {
-  useState, useRef, useEffect
-} from 'react';
+import React, { useState, useRef } from 'react';
 import type { MouseEvent } from 'react';
 import { MapPin, Navigation, Users, Search, Book, FlaskConical, Utensils, Volume2, X, ChevronDown, Wifi, WifiOff, Edit3, Save, Trash2, Route, User, LogOut } from 'lucide-react';
 import campusMapData from './campusMapData.json';
@@ -8,7 +6,7 @@ import type { Room, Event, RoomType, PathPoint, PopoverPosition } from './types'
 import {
   createPathPoint
 } from './pathUtils';
-import { useOfflineCache } from './hooks/useOfflineCache';
+
 
 interface CampusMapProps {
   isAdmin?: boolean;
@@ -17,14 +15,14 @@ interface CampusMapProps {
 }
 
 const CampusMapMVP: React.FC<CampusMapProps> = ({ isAdmin = false, onShowAdminLogin, onAdminLogout }) => {
+  // Temporarily hardcode online status to fix the hook issue
+  const isOnline = true;
+  
   const [selectedRoom, setSelectedRoom] = useState<Room | null>(null);
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
   const [showPath, setShowPath] = useState<boolean>(false);
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [filterType, setFilterType] = useState<string>('all');
-  
-  // Hook de cache offline
-  const { isOnline, cacheData, saveToCache, loadFromCache } = useOfflineCache();
   const [zoom, setZoom] = useState<number>(1);
   const [pan, setPan] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState<boolean>(false);
@@ -41,30 +39,17 @@ const CampusMapMVP: React.FC<CampusMapProps> = ({ isAdmin = false, onShowAdminLo
 
   const mapRef = useRef<SVGSVGElement | null>(null);
 
-  // Dados das salas (carregados do JSON ou cache)
+  // Dados das salas (inicializado com dados padrão)
   const [rooms, setRooms] = useState<Room[]>(() => {
-    // Tentar carregar do cache primeiro se offline
-    if (!isOnline && cacheData?.mapData) {
-      return cacheData.mapData;
-    }
     return campusMapData.map(room => ({
       ...room,
       type: room.type as RoomType
     }));
   });
 
-  // Salvar dados no cache quando online
-  useEffect(() => {
-    if (isOnline && rooms.length > 0) {
-      saveToCache({
-        mapData: rooms,
-        routes: rooms.filter(r => r.path && r.path.length > 0).map(r => ({
-          roomId: r.id,
-          path: r.path
-        }))
-      });
-    }
-  }, [isOnline, rooms, saveToCache]);
+
+
+
 
 
 
@@ -352,16 +337,6 @@ const CampusMapMVP: React.FC<CampusMapProps> = ({ isAdmin = false, onShowAdminLo
   const handleMouseUp = () => {
     setIsDragging(false);
   };
-
-  // Carregar dados do cache ao inicializar se offline
-  useEffect(() => {
-    if (!isOnline) {
-      const cachedData = loadFromCache();
-      if (cachedData?.mapData) {
-        setRooms(cachedData.mapData);
-      }
-    }
-  }, [isOnline, loadFromCache]);
 
 
 

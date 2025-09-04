@@ -7,43 +7,69 @@ interface CacheData {
 }
 
 export const useOfflineCache = () => {
-  const [isOnline, setIsOnline] = useState(navigator.onLine);
+  // Use a simpler initialization to avoid any potential issues
+  const [isOnline, setIsOnline] = useState(true);
   const [cacheData, setCacheData] = useState<CacheData | null>(null);
 
+  // Initialize online status after component mounts
   useEffect(() => {
-    const handleOnline = () => setIsOnline(true);
-    const handleOffline = () => setIsOnline(false);
+    if (typeof navigator !== 'undefined') {
+      setIsOnline(navigator.onLine);
+    }
+  }, []);
 
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
+  useEffect(() => {
+    // Only add event listeners if we're in a browser environment
+    if (typeof window !== 'undefined') {
+      const handleOnline = () => setIsOnline(true);
+      const handleOffline = () => setIsOnline(false);
 
-    return () => {
-      window.removeEventListener('online', handleOnline);
-      window.removeEventListener('offline', handleOffline);
-    };
+      window.addEventListener('online', handleOnline);
+      window.addEventListener('offline', handleOffline);
+
+      return () => {
+        window.removeEventListener('online', handleOnline);
+        window.removeEventListener('offline', handleOffline);
+      };
+    }
   }, []);
 
   const saveToCache = async (data: Omit<CacheData, 'lastUpdated'>) => {
-    const cacheData: CacheData = {
-      ...data,
-      lastUpdated: Date.now()
-    };
-    localStorage.setItem('sismap-cache', JSON.stringify(cacheData));
-    setCacheData(cacheData);
+    try {
+      const cacheData: CacheData = {
+        ...data,
+        lastUpdated: Date.now()
+      };
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem('sismap-cache', JSON.stringify(cacheData));
+        setCacheData(cacheData);
+      }
+    } catch (error) {
+      console.warn('Failed to save to cache:', error);
+    }
   };
 
   const loadFromCache = () => {
-    const cached = localStorage.getItem('sismap-cache');
-    if (cached) {
-      const data = JSON.parse(cached);
-      setCacheData(data);
-      return data;
+    try {
+      if (typeof localStorage !== 'undefined') {
+        const cached = localStorage.getItem('sismap-cache');
+        if (cached) {
+          const data = JSON.parse(cached);
+          setCacheData(data);
+          return data;
+        }
+      }
+    } catch (error) {
+      console.warn('Failed to load from cache:', error);
     }
     return null;
   };
 
   useEffect(() => {
-    loadFromCache();
+    // Load cache data on component mount
+    if (typeof window !== 'undefined') {
+      loadFromCache();
+    }
   }, []);
 
   return {
