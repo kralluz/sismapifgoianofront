@@ -2,7 +2,7 @@ import React, {
   useState, useRef, useEffect
 } from 'react';
 import type { MouseEvent } from 'react';
-import { MapPin, Navigation, Users, Search, Book, FlaskConical, Utensils, Volume2, X, ChevronDown, Wifi, WifiOff, Edit3, Save, Trash2, Route } from 'lucide-react';
+import { MapPin, Navigation, Users, Search, Book, FlaskConical, Utensils, Volume2, X, ChevronDown, Wifi, WifiOff, Edit3, Save, Trash2, Route, User, LogOut } from 'lucide-react';
 import campusMapData from './campusMapData.json';
 import type { Room, Event, RoomType, PathPoint, PopoverPosition } from './types';
 import {
@@ -10,7 +10,13 @@ import {
 } from './pathUtils';
 import { useOfflineCache } from './hooks/useOfflineCache';
 
-const CampusMapMVP: React.FC = () => {
+interface CampusMapProps {
+  isAdmin?: boolean;
+  onShowAdminLogin?: () => void;
+  onAdminLogout?: () => void;
+}
+
+const CampusMapMVP: React.FC<CampusMapProps> = ({ isAdmin = false, onShowAdminLogin, onAdminLogout }) => {
   const [selectedRoom, setSelectedRoom] = useState<Room | null>(null);
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
   const [showPath, setShowPath] = useState<boolean>(false);
@@ -399,24 +405,43 @@ const CampusMapMVP: React.FC = () => {
               {isOnline ? 'Online' : 'Offline'}
             </div>
 
-            <button
-              onClick={() => {
-                setIsEditMode(!isEditMode);
-                setEditingRoom(null);
-                setIsCreatingPath(false);
-                setTempPathPoints([]);
-                setShowEditPanel(false);
-                setIsPlacingUserPath(false);
-                setUserPathPoints([]);
-              }}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors ${isEditMode
-                ? 'bg-orange-500 hover:bg-orange-600'
-                : 'bg-white/20 hover:bg-white/30'
-                }`}
-            >
-              <Edit3 className="w-4 h-4" />
-              {isEditMode ? 'Sair da Edição' : 'Editar Mapa'}
-            </button>
+            {isAdmin ? (
+              <>
+                <button
+                  onClick={() => {
+                    setIsEditMode(!isEditMode);
+                    setEditingRoom(null);
+                    setIsCreatingPath(false);
+                    setTempPathPoints([]);
+                    setShowEditPanel(false);
+                    setIsPlacingUserPath(false);
+                    setUserPathPoints([]);
+                  }}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors ${isEditMode
+                    ? 'bg-orange-500 hover:bg-orange-600'
+                    : 'bg-white/20 hover:bg-white/30'
+                    }`}
+                >
+                  <Edit3 className="w-4 h-4" />
+                  {isEditMode ? 'Sair da Edição' : 'Editar Mapa'}
+                </button>
+                <button
+                  onClick={onAdminLogout}
+                  className="flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors bg-red-500 hover:bg-red-600 text-white"
+                >
+                  <LogOut className="w-4 h-4" />
+                  Sair
+                </button>
+              </>
+            ) : (
+              <button
+                onClick={onShowAdminLogin}
+                className="flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors bg-white/20 hover:bg-white/30"
+              >
+                <User className="w-4 h-4" />
+                Admin
+              </button>
+            )}
             {isEditMode && (
               <>
                 <button
