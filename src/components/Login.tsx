@@ -1,31 +1,86 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { MapPin, Mail, Lock, Eye, EyeOff } from 'lucide-react';
-import { api } from '../services/api';
+import { useAuth } from '../provider/AuthContext';
 
 interface LoginProps {
-  onLogin: (token: string, user: any) => void;
+  onLogin?: (token: string, user: any) => void;
 }
 
 const Login: React.FC<LoginProps> = ({ onLogin }) => {
+  const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  const [isRegisterMode, setIsRegisterMode] = useState(false);
+  
+  // Estados para registro
+  const [registerData, setRegisterData] = useState({
+    nome: '',
+    email: '',
+    senha: '',
+    role: 'user',
+    adminEmail: '',
+    adminSenha: ''
+  });
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const { login, register, isLoading, error, clearError } = useAuth();
+
+  // Limpar erros quando mudar de modo
+  useEffect(() => {
+    clearError();
+  }, [isRegisterMode, clearError]);
+
+  const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
-    setError('');
-
+    
     try {
-      const response = await api.login(email, password);
-      onLogin(response.token, response.user);
+      const response = await login(email, password);
+      
+      // Se tem onLogin (compatibilidade), chama a função
+      if (onLogin) {
+        onLogin('user-logged-in', response);
+      } else {
+        // Senão, navega para a página principal
+        navigate('/');
+      }
     } catch (err) {
-      setError('Email ou senha incorretos');
-    } finally {
-      setLoading(false);
+      // Erro já é gerenciado pelo contexto
     }
+  };
+
+  const handleRegisterSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    try {
+      const response = await register(registerData);
+      
+      // Se tem onLogin (compatibilidade), chama a função
+      if (onLogin) {
+        onLogin('user-logged-in', response);
+      } else {
+        // Senão, navega para a página principal
+        navigate('/');
+      }
+    } catch (err) {
+      // Erro já é gerenciado pelo contexto
+    }
+  };
+
+  const toggleMode = () => {
+    setIsRegisterMode(!isRegisterMode);
+    clearError();
+    // Limpar formulários
+    setEmail('');
+    setPassword('');
+    setRegisterData({
+      nome: '',
+      email: '',
+      senha: '',
+      role: 'user',
+      adminEmail: '',
+      adminSenha: ''
+    });
   };
 
   return (
@@ -36,65 +91,214 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
             <MapPin className="w-8 h-8 text-blue-600" />
             <h1 className="text-2xl font-bold text-gray-900">SisMap IF</h1>
           </div>
-          <p className="text-gray-600">Faça login para acessar o mapa do campus</p>
+          <p className="text-gray-600">
+            {isRegisterMode ? 'Criar nova conta' : 'Faça login para acessar o mapa do campus'}
+          </p>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-6">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Email
-            </label>
-            <div className="relative">
-              <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-              <input
-                type="text"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="seu@email.com"
-                required
-              />
+        {/* Formulário de Login */}
+        {!isRegisterMode && (
+          <form onSubmit={handleLoginSubmit} className="space-y-6">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Email
+              </label>
+              <div className="relative">
+                <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="seu@email.com"
+                  required
+                />
+              </div>
             </div>
-          </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Senha
-            </label>
-            <div className="relative">
-              <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-              <input
-                type={showPassword ? 'text' : 'password'}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full pl-10 pr-12 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="••••••••"
-                required
-              />
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Senha
+              </label>
+              <div className="relative">
+                <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="w-full pl-10 pr-12 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="••••••••"
+                  required
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                >
+                  {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                </button>
+              </div>
+            </div>
+
+            {error && (
+              <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+                <p className="text-red-600 text-sm">{error}</p>
+              </div>
+            )}
+
+            <button
+              type="submit"
+              disabled={isLoading}
+              className="w-full bg-blue-600 text-white py-3 rounded-lg font-medium hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              {isLoading ? 'Entrando...' : 'Entrar'}
+            </button>
+
+            <div className="text-center">
               <button
                 type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                onClick={toggleMode}
+                className="text-blue-600 hover:text-blue-800 text-sm font-medium"
               >
-                {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                Não tem conta? Registre-se
               </button>
             </div>
-          </div>
+          </form>
+        )}
 
-          {error && (
-            <div className="bg-red-50 border border-red-200 rounded-lg p-3">
-              <p className="text-red-600 text-sm">{error}</p>
+        {/* Formulário de Registro */}
+        {isRegisterMode && (
+          <form onSubmit={handleRegisterSubmit} className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Nome Completo
+              </label>
+              <input
+                type="text"
+                value={registerData.nome}
+                onChange={(e) => setRegisterData({...registerData, nome: e.target.value})}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="João Silva"
+                required
+              />
             </div>
-          )}
 
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full bg-blue-600 text-white py-3 rounded-lg font-medium hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-          >
-            {loading ? 'Entrando...' : 'Entrar'}
-          </button>
-        </form>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Email
+              </label>
+              <div className="relative">
+                <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                <input
+                  type="email"
+                  value={registerData.email}
+                  onChange={(e) => setRegisterData({...registerData, email: e.target.value})}
+                  className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="seu@email.com"
+                  required
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Senha
+              </label>
+              <div className="relative">
+                <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  value={registerData.senha}
+                  onChange={(e) => setRegisterData({...registerData, senha: e.target.value})}
+                  className="w-full pl-10 pr-12 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="••••••••"
+                  required
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                >
+                  {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                </button>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Tipo de Conta
+              </label>
+              <select
+                value={registerData.role}
+                onChange={(e) => setRegisterData({...registerData, role: e.target.value})}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              >
+                <option value="user">Usuário</option>
+                <option value="admin">Administrador</option>
+              </select>
+            </div>
+
+            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+              <p className="text-yellow-800 text-sm font-medium mb-3">
+                Credenciais do Administrador (obrigatório)
+              </p>
+              
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Email do Admin
+                  </label>
+                  <input
+                    type="email"
+                    value={registerData.adminEmail}
+                    onChange={(e) => setRegisterData({...registerData, adminEmail: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="admin@email.com"
+                    required
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Senha do Admin
+                  </label>
+                  <input
+                    type="password"
+                    value={registerData.adminSenha}
+                    onChange={(e) => setRegisterData({...registerData, adminSenha: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="••••••••"
+                    required
+                  />
+                </div>
+              </div>
+            </div>
+
+            {error && (
+              <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+                <p className="text-red-600 text-sm">{error}</p>
+              </div>
+            )}
+
+            <button
+              type="submit"
+              disabled={isLoading}
+              className="w-full bg-green-600 text-white py-3 rounded-lg font-medium hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              {isLoading ? 'Registrando...' : 'Registrar'}
+            </button>
+
+            <div className="text-center">
+              <button
+                type="button"
+                onClick={toggleMode}
+                className="text-blue-600 hover:text-blue-800 text-sm font-medium"
+              >
+                Já tem conta? Faça login
+              </button>
+            </div>
+          </form>
+        )}
       </div>
     </div>
   );

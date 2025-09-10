@@ -68,3 +68,43 @@ export interface CampusMapData {
   events: Event[];
   customPaths?: Path[];
 }
+
+// Tipos para autenticação
+export interface User {
+  id: number;
+  nome: string;
+  email: string;
+  role: string;
+}
+
+export interface LoginRequest {
+  email: string;
+  senha: string;
+}
+
+export interface RegisterRequest {
+  nome: string;
+  email: string;
+  senha: string;
+  role: string;
+  adminEmail: string;
+  adminSenha: string;
+}
+
+export interface AuthResponse {
+  id: number;
+  nome: string;
+  email: string;
+  role: string;
+}
+
+export interface AuthContextType {
+  user: User | null;
+  isAuthenticated: boolean;
+  isLoading: boolean;
+  login: (email: string, senha: string) => Promise<AuthResponse>;
+  register: (userData: RegisterRequest) => Promise<AuthResponse>;
+  logout: () => void;
+  error: string | null;
+  clearError: () => void;
+}

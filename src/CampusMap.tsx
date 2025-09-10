@@ -1,20 +1,35 @@
 import React, { useState, useRef } from 'react';
 import type { MouseEvent } from 'react';
-import { MapPin, Navigation, Users, Search, Book, FlaskConical, Utensils, Volume2, X, ChevronDown, Wifi, WifiOff, Edit3, Save, Trash2, Route, User, LogOut } from 'lucide-react';
-import campusMapData from './campusMapData.json';
+import { useNavigate } from 'react-router-dom';
+import { 
+  MapPin, 
+  Search, 
+  Navigation, 
+  Users, 
+  Book, 
+  FlaskConical, 
+  Volume2, 
+  Utensils,
+  Edit3,
+  Save,
+  X,
+  Trash2,
+  Route,
+  ChevronDown,
+  Wifi,
+  WifiOff,
+  User,
+  LogOut
+} from 'lucide-react';
 import type { Room, Event, RoomType, PathPoint, PopoverPosition } from './types';
-import {
-  createPathPoint
-} from './pathUtils';
+import { createPathPoint } from './pathUtils';
+import campusMapData from './campusMapData.json';
+import { useAuth } from './provider/AuthContext';
 
-
-interface CampusMapProps {
-  isAdmin?: boolean;
-  onShowAdminLogin?: () => void;
-  onAdminLogout?: () => void;
-}
-
-const CampusMapMVP: React.FC<CampusMapProps> = ({ isAdmin = false, onShowAdminLogin, onAdminLogout }) => {
+const CampusMapMVP: React.FC = () => {
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
+  const isAdmin = user?.role === 'admin';
   // Temporarily hardcode online status to fix the hook issue
   const isOnline = true;
   
@@ -401,7 +416,10 @@ const CampusMapMVP: React.FC<CampusMapProps> = ({ isAdmin = false, onShowAdminLo
                   {isEditMode ? 'Sair da Edição' : 'Editar Mapa'}
                 </button>
                 <button
-                  onClick={onAdminLogout}
+                  onClick={() => {
+                    logout();
+                    navigate('/login');
+                  }}
                   className="flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors bg-red-500 hover:bg-red-600 text-white"
                 >
                   <LogOut className="w-4 h-4" />
@@ -410,11 +428,11 @@ const CampusMapMVP: React.FC<CampusMapProps> = ({ isAdmin = false, onShowAdminLo
               </>
             ) : (
               <button
-                onClick={onShowAdminLogin}
+                onClick={() => navigate('/login')}
                 className="flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors bg-white/20 hover:bg-white/30"
               >
                 <User className="w-4 h-4" />
-                Admin
+                Login
               </button>
             )}
             {isEditMode && (

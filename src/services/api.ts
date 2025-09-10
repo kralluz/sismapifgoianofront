@@ -1,3 +1,5 @@
+import type { LoginRequest, RegisterRequest, AuthResponse } from '../types';
+
 const API_BASE_URL = "http://localhost:3000";
 
 const getAuthHeaders = () => {
@@ -20,13 +22,95 @@ const getAuthHeadersNoContentType = () => {
   return headers;
 };
 
+// Funções de autenticação baseadas na documentação da API
+export const authAPI = {
+  // Login do usuário - POST /auth/login
+  login: async (loginData: LoginRequest): Promise<AuthResponse> => {
+    const response = await fetch(`${API_BASE_URL}/auth/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(loginData),
+    });
+    
+    if (!response.ok) {
+      if (response.status === 401) {
+        throw new Error("Credenciais inválidas");
+      }
+      throw new Error("Erro ao fazer login");
+    }
+    
+    return response.json();
+  },
+
+  // Registro de usuário - POST /auth/register
+  register: async (userData: RegisterRequest): Promise<AuthResponse> => {
+    const response = await fetch(`${API_BASE_URL}/auth/register`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(userData),
+    });
+    
+    if (!response.ok) {
+      if (response.status === 400) {
+        throw new Error("Email já cadastrado ou dados inválidos");
+      }
+      if (response.status === 403) {
+        throw new Error("Apenas administradores podem criar contas");
+      }
+      throw new Error("Erro ao registrar usuário");
+    }
+    
+    return response.json();
+  },
+
+  // Endpoints alternativos (sem /auth prefix) - conforme documentação
+  // POST /login
+  loginAlt: async (loginData: LoginRequest): Promise<AuthResponse> => {
+    const response = await fetch(`${API_BASE_URL}/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(loginData),
+    });
+    
+    if (!response.ok) {
+      if (response.status === 401) {
+        throw new Error("Credenciais inválidas");
+      }
+      throw new Error("Erro ao fazer login");
+    }
+    
+    return response.json();
+  },
+
+  // POST /register
+  registerAlt: async (userData: RegisterRequest): Promise<AuthResponse> => {
+    const response = await fetch(`${API_BASE_URL}/register`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(userData),
+    });
+    
+    if (!response.ok) {
+      if (response.status === 400) {
+        throw new Error("Email já cadastrado ou dados inválidos");
+      }
+      if (response.status === 403) {
+        throw new Error("Apenas administradores podem criar contas");
+      }
+      throw new Error("Erro ao registrar usuário");
+    }
+    
+    return response.json();
+  },
+};
+
 export const api = {
-  // Login
+  // Método de login legado (mantido para compatibilidade)
   login: async (email: string, password: string) => {
     const response = await fetch(`${API_BASE_URL}/auth/login`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, password }),
+      body: JSON.stringify({ email, senha: password }),
     });
     if (!response.ok) throw new Error("Erro ao fazer login");
     return response.json();
@@ -154,6 +238,105 @@ export const api = {
   healthCheck: async () => {
     const response = await fetch(`${API_BASE_URL}/health`);
     if (!response.ok) throw new Error("Erro ao verificar saúde da API");
+    return response.json();
+  },
+};
+
+// API para gerenciamento de usuários
+export const userAPI = {
+  // Listar todos os usuários (apenas admin)
+  getUsers: async () => {
+    const response = await fetch(`${API_BASE_URL}/users`, {
+      method: "GET",
+      headers: getAuthHeaders(),
+    });
+    
+    if (!response.ok) {
+      if (response.status === 403) {
+        throw new Error("Acesso negado. Apenas administradores podem listar usuários");
+      }
+      throw new Error("Erro ao buscar usuários");
+    }
+    
+    return response.json();
+  },
+
+  // Criar usuário (apenas admin)
+  createUser: async (userData: RegisterRequest) => {
+    const response = await fetch(`${API_BASE_URL}/users`, {
+      method: "POST",
+      headers: getAuthHeaders(),
+      body: JSON.stringify(userData),
+    });
+    
+    if (!response.ok) {
+      if (response.status === 400) {
+        throw new Error("Email já cadastrado ou dados inválidos");
+      }
+      if (response.status === 403) {
+        throw new Error("Apenas administradores podem criar usuários");
+      }
+      throw new Error("Erro ao criar usuário");
+    }
+    
+    return response.json();
+  },
+
+  // Atualizar usuário (apenas admin)
+  updateUser: async (userId: number, userData: Partial<RegisterRequest>) => {
+    const response = await fetch(`${API_BASE_URL}/users/${userId}`, {
+      method: "PUT",
+      headers: getAuthHeaders(),
+      body: JSON.stringify(userData),
+    });
+    
+    if (!response.ok) {
+      if (response.status === 403) {
+        throw new Error("Acesso negado");
+      }
+      if (response.status === 404) {
+        throw new Error("Usuário não encontrado");
+      }
+      throw new Error("Erro ao atualizar usuário");
+    }
+    
+    return response.json();
+  },
+
+  // Deletar usuário (apenas admin)
+  deleteUser: async (userId: number) => {
+    const response = await fetch(`${API_BASE_URL}/users/${userId}`, {
+      method: "DELETE",
+      headers: getAuthHeaders(),
+    });
+    
+    if (!response.ok) {
+      if (response.status === 403) {
+        throw new Error("Acesso negado");
+      }
+      if (response.status === 404) {
+        throw new Error("Usuário não encontrado");
+      }
+      throw new Error("Erro ao deletar usuário");
+    }
+    
+    return response.json();
+  },
+
+  // Buscar usuário por ID
+  getUser: async (userId: number) => {
+    const response = await fetch(`${API_BASE_URL}/users/${userId}`, {
+      method: "GET",
+      headers: getAuthHeaders(),
+    });
+    
+    if (!response.ok) {
+      if (response.status === 404) {
+        throw new Error("Usuário não encontrado");
+      }
+      throw new Error("Erro ao buscar usuário");
+    }
+    
     return response.json();
   },
 };
