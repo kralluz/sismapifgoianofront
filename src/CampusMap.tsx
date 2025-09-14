@@ -1,14 +1,14 @@
-import React, { useState, useRef } from 'react';
-import type { MouseEvent } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { 
-  MapPin, 
-  Search, 
-  Navigation, 
-  Users, 
-  Book, 
-  FlaskConical, 
-  Volume2, 
+import React, { useState, useRef } from "react";
+import type { MouseEvent } from "react";
+import { useNavigate } from "react-router-dom";
+import {
+  MapPin,
+  Search,
+  Navigation,
+  Users,
+  Book,
+  FlaskConical,
+  Volume2,
   Utensils,
   Edit3,
   Save,
@@ -19,99 +19,99 @@ import {
   Wifi,
   WifiOff,
   User,
-  LogOut
-} from 'lucide-react';
-import type { Room, Event, RoomType, PathPoint, PopoverPosition } from './types';
-import { createPathPoint } from './pathUtils';
-import campusMapData from './campusMapData.json';
-import { useAuth } from './provider/AuthContext';
+  LogOut,
+} from "lucide-react";
+import type {
+  Room,
+  Event,
+  RoomType,
+  PathPoint,
+  PopoverPosition,
+} from "./types";
+import { createPathPoint } from "./pathUtils";
+import campusMapData from "./campusMapData.json";
+import { useAuth } from "./provider/AuthContext";
 
 const CampusMapMVP: React.FC = () => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
-  const isAdmin = user?.role === 'admin';
-  // Temporarily hardcode online status to fix the hook issue
+  const isAdmin = user?.role === "admin";
+
   const isOnline = true;
-  
+
   const [selectedRoom, setSelectedRoom] = useState<Room | null>(null);
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
   const [showPath, setShowPath] = useState<boolean>(false);
-  const [searchTerm, setSearchTerm] = useState<string>('');
-  const [filterType, setFilterType] = useState<string>('all');
+  const [searchTerm, setSearchTerm] = useState<string>("");
+  const [filterType, setFilterType] = useState<string>("all");
   const [zoom, setZoom] = useState<number>(1);
   const [pan, setPan] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState<boolean>(false);
-  const [dragStart, setDragStart] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+  const [dragStart, setDragStart] = useState<{ x: number; y: number }>({
+    x: 0,
+    y: 0,
+  });
 
-  // Estados para modo de edição
   const [isEditMode, setIsEditMode] = useState<boolean>(false);
   const [editingRoom, setEditingRoom] = useState<Room | null>(null);
   const [isCreatingPath, setIsCreatingPath] = useState<boolean>(false);
-  const [tempPathPoints, setTempPathPoints] = useState<{ x: number; y: number }[]>([]);
+  const [tempPathPoints, setTempPathPoints] = useState<
+    { x: number; y: number }[]
+  >([]);
   const [showEditPanel, setShowEditPanel] = useState<boolean>(false);
-  const [userPathPoints, setUserPathPoints] = useState<{ x: number; y: number }[]>([]);
+  const [userPathPoints, setUserPathPoints] = useState<
+    { x: number; y: number }[]
+  >([]);
   const [isPlacingUserPath, setIsPlacingUserPath] = useState<boolean>(false);
 
   const mapRef = useRef<SVGSVGElement | null>(null);
 
-  // Dados das salas (inicializado com dados padrão)
   const [rooms, setRooms] = useState<Room[]>(() => {
-    return campusMapData.map(room => ({
+    return campusMapData.map((room) => ({
       ...room,
-      type: room.type as RoomType
+      id: parseInt(room.id.toString()) || Date.now(), // Converter para number
+      type: room.type as RoomType,
     }));
   });
 
-
-
-
-
-
-
-
-
-  // Função para obter ícone do tipo de sala
-  const getRoomIcon = (type: RoomType) => {
-    const icons = {
+  const getRoomIcon = (type: string) => {
+    const icons: Record<string, any> = {
       classroom: Book,
       lab: FlaskConical,
       library: Book,
       auditorium: Volume2,
       restaurant: Utensils,
-      office: Users
+      office: Users,
     };
     return icons[type] || MapPin;
   };
 
-  // Função para obter cor do tipo de sala
   const getRoomColor = (room: Room, isSelected: boolean) => {
     if (isSelected) return "#ef4444";
-    const colors = {
+    const colors: Record<string, string> = {
       classroom: "#3b82f6",
       lab: "#8b5cf6",
       library: "#10b981",
       auditorium: "#f59e0b",
       restaurant: "#f97316",
-      office: "#6b7280"
+      office: "#6b7280",
     };
     return colors[room.type] || "#3b82f6";
   };
 
-  // Sistema de caminhos melhorado usando utilitários
-  const getPathToRoom = (roomId: string): PathPoint[] => {
-    const room = rooms.find(r => r.id === roomId);
+  const getPathToRoom = (roomId: number): PathPoint[] => {
+    const room = rooms.find((r) => r.id === roomId);
     if (!room || !room.path || room.path.length === 0) return [];
 
-    // Converter os pontos simples do JSON para PathPoint
     return room.path.map((point, index) => {
-      let type: PathPoint['type'] = 'waypoint';
-      let label = '';
+      let type: PathPoint["type"] = "waypoint";
+      let label = "";
 
       if (index === 0) {
-        type = 'entrance';
-        label = 'Entrada Principal';
+        type = "entrance";
+        label = "Entrada Principal";
       } else if (index === (room.path?.length || 0) - 1) {
-        type = 'destination';
+        type = "destination";
         label = room.name;
       }
 
@@ -119,12 +119,11 @@ const CampusMapMVP: React.FC = () => {
     });
   };
 
-  // Função para calcular posição do popover sem sobreposição
   const getPopoverPosition = (room: Room | null): PopoverPosition => {
-    if (!room) return { top: '1rem', left: '1rem' };
+    if (!room) return { top: "1rem", left: "1rem" };
 
     const mapContainer = mapRef.current?.getBoundingClientRect();
-    if (!mapContainer) return { top: '1rem', left: '1rem' };
+    if (!mapContainer) return { top: "1rem", left: "1rem" };
 
     const svgX = (room.x / 100) * mapContainer.width;
     const svgY = (room.y / 100) * mapContainer.height;
@@ -145,7 +144,10 @@ const CampusMapMVP: React.FC = () => {
       top = mapContainer.height - popoverHeight - 20;
     }
 
-    if (Math.abs(left - svgX) < 50 && Math.abs(top + popoverHeight / 2 - svgY) < 30) {
+    if (
+      Math.abs(left - svgX) < 50 &&
+      Math.abs(top + popoverHeight / 2 - svgY) < 30
+    ) {
       top = svgY + 30;
       left = svgX - popoverWidth / 2;
 
@@ -157,57 +159,52 @@ const CampusMapMVP: React.FC = () => {
 
     return {
       left: `${Math.max(20, left)}px`,
-      top: `${Math.max(20, top)}px`
+      top: `${Math.max(20, top)}px`,
     };
   };
 
-  // Filtros aprimorados para salas
   const filteredRooms = rooms.filter((room) => {
-    const matchesSearch = room.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    const matchesSearch =
+      room.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       room.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
       room.building.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesType = filterType === 'all' || room.type === filterType;
+    const matchesType = filterType === "all" || room.type === filterType;
     return matchesSearch && matchesType;
   });
 
-  // Funções de edição
   const handleMapClick = (e: MouseEvent<SVGSVGElement>) => {
     if (!isEditMode) return;
 
     const rect = mapRef.current?.getBoundingClientRect();
     if (!rect) return;
 
-    // Ajustar coordenadas considerando zoom e pan
     const svgX = (e.clientX - rect.left - pan.x) / zoom;
     const svgY = (e.clientY - rect.top - pan.y) / zoom;
 
-    // Converter para coordenadas relativas (0-100)
     const x = (svgX / rect.width) * 100;
     const y = (svgY / rect.height) * 100;
 
-    // Garantir que as coordenadas estejam dentro dos limites
     const clampedX = Math.max(0, Math.min(100, x));
     const clampedY = Math.max(0, Math.min(100, y));
 
     if (isPlacingUserPath) {
-      setUserPathPoints(prev => [...prev, { x: clampedX, y: clampedY }]);
+      setUserPathPoints((prev) => [...prev, { x: clampedX, y: clampedY }]);
     } else if (isCreatingPath) {
-      setTempPathPoints(prev => [...prev, { x: clampedX, y: clampedY }]);
+      setTempPathPoints((prev) => [...prev, { x: clampedX, y: clampedY }]);
     } else {
-      // Criar novo local
       const newRoom: Room = {
-        id: `custom-${Date.now()}`,
+        id: Date.now(), // Usar timestamp como ID único
         name: `Novo Local ${rooms.length + 1}`,
         x: clampedX,
         y: clampedY,
-        description: 'Local personalizado',
+        description: "Local personalizado",
         capacity: 20,
-        type: 'classroom',
+        type: "classroom",
         floor: 1,
-        building: 'X',
-        amenities: []
+        building: "X",
+        amenities: [],
       };
-      setRooms(prev => [...prev, newRoom]);
+      setRooms((prev) => [...prev, newRoom]);
       setEditingRoom(newRoom);
     }
   };
@@ -220,34 +217,36 @@ const CampusMapMVP: React.FC = () => {
     }
 
     if (isCreatingPath) {
-      // Verificar se temos pontos suficientes
       if (tempPathPoints.length < 1) {
-        alert('Adicione pelo menos um ponto antes de finalizar o caminho clicando em uma sala.');
+        alert(
+          "Adicione pelo menos um ponto antes de finalizar o caminho clicando em uma sala."
+        );
         return;
       }
 
-      // Finalizar criação do caminho
       const points: PathPoint[] = tempPathPoints.map((point, index) => {
-        let type: PathPoint['type'] = 'waypoint';
-        let label = '';
+        let type: PathPoint["type"] = "waypoint";
+        let label = "";
 
         if (index === 0) {
-          type = 'entrance';
-          label = 'Entrada Principal';
+          type = "entrance";
+          label = "Entrada Principal";
         } else if (index === tempPathPoints.length - 1) {
-          type = 'destination';
+          type = "destination";
           label = room.name;
         }
 
         return createPathPoint(point.x, point.y, type, label);
       });
 
-      // Adiciona o ponto final da sala se não estiver incluído
-      if (tempPathPoints.length === 0 || tempPathPoints[tempPathPoints.length - 1].x !== room.x || tempPathPoints[tempPathPoints.length - 1].y !== room.y) {
-        points.push(createPathPoint(room.x, room.y, 'destination', room.name));
+      if (
+        tempPathPoints.length === 0 ||
+        tempPathPoints[tempPathPoints.length - 1].x !== room.x ||
+        tempPathPoints[tempPathPoints.length - 1].y !== room.y
+      ) {
+        points.push(createPathPoint(room.x, room.y, "destination", room.name));
       }
 
-      // Como não temos mais customPaths, apenas mostramos uma mensagem
       alert(`Caminho para ${room.name} criado com sucesso!`);
       setTempPathPoints([]);
       setIsCreatingPath(false);
@@ -255,30 +254,28 @@ const CampusMapMVP: React.FC = () => {
 
     setSelectedRoom(room);
     setSelectedEvent(null);
-    setShowPath(true); // Alterado para true para exibir o caminho automaticamente
+    setShowPath(true);
   };
 
-
-
   const saveRoomEdit = (updatedRoom: Room) => {
-    setRooms(prev => prev.map(room =>
-      room.id === updatedRoom.id ? updatedRoom : room
-    ));
+    setRooms((prev) =>
+      prev.map((room) => (room.id === updatedRoom.id ? updatedRoom : room))
+    );
     setEditingRoom(null);
     setShowEditPanel(false);
   };
 
-  const deleteRoom = (roomId: string) => {
-    setRooms(prev => prev.filter(room => room.id !== roomId));
+  const deleteRoom = (roomId: number) => {
+    setRooms((prev) => prev.filter((room) => room.id !== roomId));
     setEditingRoom(null);
     setShowEditPanel(false);
   };
 
   const startPathCreation = () => {
     setIsCreatingPath(true);
-    setTempPathPoints([]); // Começar com array vazio
+    setTempPathPoints([]);
     setSelectedRoom(null);
-    setShowEditPanel(false); // Fechar painel de edição se estiver aberto
+    setShowEditPanel(false);
   };
 
   const cancelPathCreation = () => {
@@ -286,36 +283,38 @@ const CampusMapMVP: React.FC = () => {
     setTempPathPoints([]);
   };
 
-  // Validação em tempo real do caminho sendo criado
-  const validateCurrentPath = (points: { x: number; y: number }[]): { isValid: boolean; warnings: string[]; errors: string[] } => {
+  const validateCurrentPath = (
+    points: { x: number; y: number }[]
+  ): { isValid: boolean; warnings: string[]; errors: string[] } => {
     const warnings: string[] = [];
     const errors: string[] = [];
 
-    // Só requerer 2 pontos se já começou a criar o caminho
     if (points.length >= 1 && points.length < 2) {
-      // Não é erro, apenas aviso
     } else if (points.length < 2 && points.length > 0) {
-      errors.push('Adicione pelo menos mais um ponto para criar um caminho válido');
+      errors.push(
+        "Adicione pelo menos mais um ponto para criar um caminho válido"
+      );
     }
 
-    // Verifica se os pontos estão muito próximos
     for (let i = 0; i < points.length - 1; i++) {
       const distance = Math.sqrt(
         Math.pow(points[i + 1].x - points[i].x, 2) +
-        Math.pow(points[i + 1].y - points[i].y, 2)
+          Math.pow(points[i + 1].y - points[i].y, 2)
       );
 
-      if (distance < 3) { // Aumentei o limite para 3 unidades
-        warnings.push(`Pontos ${i + 1} e ${i + 2} estão muito próximos (${distance.toFixed(1)} unidades)`);
+      if (distance < 3) {
+        warnings.push(
+          `Pontos ${i + 1} e ${i + 2} estão muito próximos (${distance.toFixed(
+            1
+          )} unidades)`
+        );
       }
     }
 
-    // Verifica se o caminho é muito longo
-    if (points.length > 15) { // Aumentei o limite
-      warnings.push('Caminho muito longo. Considere simplificar a rota');
+    if (points.length > 15) {
+      warnings.push("Caminho muito longo. Considere simplificar a rota");
     }
 
-    // Verifica se há pontos fora dos limites
     points.forEach((point, index) => {
       if (point.x < 0 || point.x > 100 || point.y < 0 || point.y > 100) {
         errors.push(`Ponto ${index + 1} está fora dos limites do mapa`);
@@ -325,20 +324,15 @@ const CampusMapMVP: React.FC = () => {
     return {
       isValid: errors.length === 0,
       warnings,
-      errors
+      errors,
     };
   };
 
-
-
-
-
-  // Controles de zoom e pan
-  const handleZoomIn = () => setZoom(prev => Math.min(prev * 1.2, 3));
-  const handleZoomOut = () => setZoom(prev => Math.max(prev / 1.2, 0.5));
+  const handleZoomIn = () => setZoom((prev) => Math.min(prev * 1.2, 3));
+  const handleZoomOut = () => setZoom((prev) => Math.max(prev / 1.2, 0.5));
 
   const handleMouseDown = (e: MouseEvent<SVGSVGElement>) => {
-    if (isEditMode) return; // Não permitir drag no modo de edição
+    if (isEditMode) return;
     setIsDragging(true);
     setDragStart({ x: e.clientX - pan.x, y: e.clientY - pan.y });
   };
@@ -353,18 +347,14 @@ const CampusMapMVP: React.FC = () => {
     setIsDragging(false);
   };
 
+  const displayPathPoints =
+    showPath && selectedRoom ? getPathToRoom(selectedRoom.id) : [];
 
-
-
-
-  const displayPathPoints = showPath && selectedRoom ? getPathToRoom(selectedRoom.id) : [];
-
-  // Debug: verificar se o caminho está sendo calculado
-  console.log('Debug caminho:', {
+  console.log("Debug caminho:", {
     showPath,
     selectedRoom: selectedRoom?.id,
     displayPathPointsLength: displayPathPoints.length,
-    displayPathPoints
+    displayPathPoints,
   });
 
   return (
@@ -376,23 +366,34 @@ const CampusMapMVP: React.FC = () => {
             <h1 className="text-xl font-bold flex items-center gap-2">
               <MapPin className="w-6 h-6" />
               Campus IF - Mapa Interativo
-              {isEditMode && <span className="bg-orange-500 px-2 py-1 rounded text-sm">MODO EDIÇÃO</span>}
+              {isEditMode && (
+                <span className="bg-orange-500 px-2 py-1 rounded text-sm">
+                  MODO EDIÇÃO
+                </span>
+              )}
             </h1>
             <p className="text-blue-100 text-sm">
               {isEditMode
                 ? isPlacingUserPath
                   ? `Colocando pontos do caminho (${userPathPoints.length} pontos) - Clique no mapa para adicionar pontos. Clique nos pontos verdes para removê-los.`
                   : isCreatingPath
-                    ? `Adicionando pontos do caminho (${tempPathPoints.length} pontos) - Clique no mapa para adicionar pontos, clique nos pontos amarelos para removê-los. Clique em uma sala para finalizar ou use o botão "Finalizar"`
-                    : 'Clique no mapa para adicionar locais, clique em locais para editar propriedades'
-                : 'Navegação inteligente e eventos em tempo real'
-              }
+                  ? `Adicionando pontos do caminho (${tempPathPoints.length} pontos) - Clique no mapa para adicionar pontos, clique nos pontos amarelos para removê-los. Clique em uma sala para finalizar ou use o botão "Finalizar"`
+                  : "Clique no mapa para adicionar locais, clique em locais para editar propriedades"
+                : "Navegação inteligente e eventos em tempo real"}
             </p>
           </div>
           <div className="flex items-center gap-3">
-            <div className={`flex items-center gap-2 px-3 py-1 rounded-full text-sm ${isOnline ? 'bg-green-500' : 'bg-red-500'}`}>
-              {isOnline ? <Wifi className="w-4 h-4" /> : <WifiOff className="w-4 h-4" />}
-              {isOnline ? 'Online' : 'Offline'}
+            <div
+              className={`flex items-center gap-2 px-3 py-1 rounded-full text-sm ${
+                isOnline ? "bg-green-500" : "bg-red-500"
+              }`}
+            >
+              {isOnline ? (
+                <Wifi className="w-4 h-4" />
+              ) : (
+                <WifiOff className="w-4 h-4" />
+              )}
+              {isOnline ? "Online" : "Offline"}
             </div>
 
             {isAdmin ? (
@@ -407,18 +408,19 @@ const CampusMapMVP: React.FC = () => {
                     setIsPlacingUserPath(false);
                     setUserPathPoints([]);
                   }}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors ${isEditMode
-                    ? 'bg-orange-500 hover:bg-orange-600'
-                    : 'bg-white/20 hover:bg-white/30'
-                    }`}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors ${
+                    isEditMode
+                      ? "bg-orange-500 hover:bg-orange-600"
+                      : "bg-white/20 hover:bg-white/30"
+                  }`}
                 >
                   <Edit3 className="w-4 h-4" />
-                  {isEditMode ? 'Sair da Edição' : 'Editar Mapa'}
+                  {isEditMode ? "Sair da Edição" : "Editar Mapa"}
                 </button>
                 <button
                   onClick={() => {
                     logout();
-                    navigate('/login');
+                    navigate("/login");
                   }}
                   className="flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors bg-red-500 hover:bg-red-600 text-white"
                 >
@@ -428,7 +430,7 @@ const CampusMapMVP: React.FC = () => {
               </>
             ) : (
               <button
-                onClick={() => navigate('/login')}
+                onClick={() => navigate("/login")}
                 className="flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors bg-white/20 hover:bg-white/30"
               >
                 <User className="w-4 h-4" />
@@ -444,13 +446,14 @@ const CampusMapMVP: React.FC = () => {
                       setUserPathPoints([]);
                     }
                   }}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors ${isPlacingUserPath
-                    ? 'bg-green-500 hover:bg-green-600'
-                    : 'bg-blue-500 hover:bg-blue-600'
-                    } text-white`}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors ${
+                    isPlacingUserPath
+                      ? "bg-green-500 hover:bg-green-600"
+                      : "bg-blue-500 hover:bg-blue-600"
+                  } text-white`}
                 >
                   <Route className="w-4 h-4" />
-                  {isPlacingUserPath ? 'Finalizar Caminho' : 'Colocar Caminho'}
+                  {isPlacingUserPath ? "Finalizar Caminho" : "Colocar Caminho"}
                 </button>
               </>
             )}
@@ -459,11 +462,19 @@ const CampusMapMVP: React.FC = () => {
       </div>
 
       {/* Mapa Container aprimorado - 60% da tela */}
-      <div className="flex-1 relative bg-gray-100 overflow-hidden" style={{ minHeight: '60vh' }}>
+      <div
+        className="flex-1 relative bg-gray-100 overflow-hidden"
+        style={{ minHeight: "60vh" }}
+      >
         <svg
           ref={mapRef}
-          className={`w-full h-full select-none ${isEditMode ? 'cursor-crosshair' : isDragging ? 'cursor-grabbing' : 'cursor-grab'
-            }`}
+          className={`w-full h-full select-none ${
+            isEditMode
+              ? "cursor-crosshair"
+              : isDragging
+              ? "cursor-grabbing"
+              : "cursor-grab"
+          }`}
           viewBox="0 0 100 100"
           preserveAspectRatio="xMidYMid meet"
           onClick={handleMapClick}
@@ -472,15 +483,20 @@ const CampusMapMVP: React.FC = () => {
           onMouseUp={handleMouseUp}
           onMouseLeave={handleMouseUp}
           style={{
-            transform: `scale(${zoom}) translate(${pan.x / zoom}px, ${pan.y / zoom}px)`
+            transform: `scale(${zoom}) translate(${pan.x / zoom}px, ${
+              pan.y / zoom
+            }px)`,
           }}
         >
           {/* Imagem do mapa como fundo */}
-          <image href="/mapa/mapa.png" x="0" y="0" width="100" height="100" preserveAspectRatio="xMidYMid meet" />
-
-
-
-
+          <image
+            href="/mapa/mapa.png"
+            x="0"
+            y="0"
+            width="100"
+            height="100"
+            preserveAspectRatio="xMidYMid meet"
+          />
 
           {/* Caminho temporário durante criação */}
           {isCreatingPath && tempPathPoints.length > 0 && (
@@ -515,7 +531,9 @@ const CampusMapMVP: React.FC = () => {
                     className="animate-pulse cursor-pointer hover:fill-red-500"
                     onClick={(e) => {
                       e.stopPropagation();
-                      setTempPathPoints(prev => prev.filter((_, i) => i !== index));
+                      setTempPathPoints((prev) =>
+                        prev.filter((_, i) => i !== index)
+                      );
                     }}
                   />
                   <text
@@ -568,7 +586,9 @@ const CampusMapMVP: React.FC = () => {
                     onClick={(e) => {
                       if (isPlacingUserPath) {
                         e.stopPropagation();
-                        setUserPathPoints(prev => prev.filter((_, i) => i !== index));
+                        setUserPathPoints((prev) =>
+                          prev.filter((_, i) => i !== index)
+                        );
                       }
                     }}
                   />
@@ -637,14 +657,21 @@ const CampusMapMVP: React.FC = () => {
                   fill={getRoomColor(room, isSelected || isEditing)}
                   stroke="white"
                   strokeWidth="0.8"
-                  className={`${isEditMode ? 'cursor-pointer hover:scale-125' : 'cursor-pointer hover:scale-110'} transition-all duration-200`}
+                  className={`${
+                    isEditMode
+                      ? "cursor-pointer hover:scale-125"
+                      : "cursor-pointer hover:scale-110"
+                  } transition-all duration-200`}
                   onClick={(e) => {
                     e.stopPropagation();
                     handleRoomClick(room);
                   }}
                   style={{
-                    filter: (isSelected || isEditing) ? 'drop-shadow(0 0 5px rgba(239, 68, 68, 0.8))' : 'none',
-                    strokeDasharray: isEditing ? '2,1' : 'none'
+                    filter:
+                      isSelected || isEditing
+                        ? "drop-shadow(0 0 5px rgba(239, 68, 68, 0.8))"
+                        : "none",
+                    strokeDasharray: isEditing ? "2,1" : "none",
                   }}
                 />
                 <text
@@ -654,7 +681,9 @@ const CampusMapMVP: React.FC = () => {
                   textAnchor="middle"
                   fill="#1f2937"
                   className="font-semibold pointer-events-none select-none"
-                  style={{ filter: 'drop-shadow(0 1px 1px rgba(255,255,255,0.8))' }}
+                  style={{
+                    filter: "drop-shadow(0 1px 1px rgba(255,255,255,0.8))",
+                  }}
                 >
                   {room.name}
                 </text>
@@ -697,11 +726,17 @@ const CampusMapMVP: React.FC = () => {
           >
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
-                {React.createElement(getRoomIcon(selectedRoom.type), { className: "w-5 h-5 text-blue-600" })}
+                {React.createElement(getRoomIcon(selectedRoom.type), {
+                  className: "w-5 h-5 text-blue-600",
+                })}
                 <h3 className="font-bold text-gray-900">{selectedRoom.name}</h3>
               </div>
               <button
-                onClick={() => { setSelectedRoom(null); setShowPath(false); setSelectedEvent(null); }}
+                onClick={() => {
+                  setSelectedRoom(null);
+                  setShowPath(false);
+                  setSelectedEvent(null);
+                }}
                 className="text-gray-400 hover:text-gray-600 p-1 hover:bg-gray-100 rounded-full transition-colors"
               >
                 <X className="w-4 h-4" />
@@ -709,7 +744,9 @@ const CampusMapMVP: React.FC = () => {
             </div>
 
             <div className="space-y-2 mb-3">
-              <p className="text-gray-600 text-sm">{selectedRoom.description}</p>
+              <p className="text-gray-600 text-sm">
+                {selectedRoom.description}
+              </p>
               <div className="flex items-center gap-4 text-xs text-gray-500">
                 <span className="flex items-center gap-1">
                   🏢 Prédio {selectedRoom.building}
@@ -730,7 +767,10 @@ const CampusMapMVP: React.FC = () => {
                 </h4>
                 <div className="flex flex-wrap gap-1">
                   {selectedRoom.amenities.map((amenity, index) => (
-                    <span key={index} className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full font-medium">
+                    <span
+                      key={index}
+                      className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full font-medium"
+                    >
                       {amenity}
                     </span>
                   ))}
@@ -742,15 +782,27 @@ const CampusMapMVP: React.FC = () => {
               <div className="border-t pt-3">
                 <div className="flex items-center gap-2 mb-2">
                   <span className="text-green-600">📅</span>
-                  <span className="font-semibold text-sm text-gray-900">Evento Atual:</span>
+                  <span className="font-semibold text-sm text-gray-900">
+                    Evento Atual:
+                  </span>
                 </div>
                 <div className="bg-gradient-to-r from-green-50 to-blue-50 p-3 rounded-lg">
-                  <p className="font-semibold text-sm text-gray-900 mb-1">{selectedEvent.title}</p>
-                  <p className="text-xs text-gray-600 mb-1">📅 {selectedEvent.time} - {selectedEvent.date}</p>
-                  <p className="text-xs text-gray-600 mb-2">👨‍🏫 {selectedEvent.speaker}</p>
+                  <p className="font-semibold text-sm text-gray-900 mb-1">
+                    {selectedEvent.title}
+                  </p>
+                  <p className="text-xs text-gray-600 mb-1">
+                    📅 {selectedEvent.time} - {selectedEvent.date}
+                  </p>
+                  <p className="text-xs text-gray-600 mb-2">
+                    👨‍🏫 {selectedEvent.speaker}
+                  </p>
                   <div className="flex items-center justify-between">
-                    <span className="text-xs text-gray-500">Status: {selectedEvent?.status || 'N/A'}</span>
-                    <span className="text-xs text-gray-500">👥 {selectedEvent?.attendees || 0} participantes</span>
+                    <span className="text-xs text-gray-500">
+                      Status: {selectedEvent?.status || "N/A"}
+                    </span>
+                    <span className="text-xs text-gray-500">
+                      👥 {selectedEvent?.attendees || 0} participantes
+                    </span>
                   </div>
                 </div>
               </div>
@@ -760,11 +812,11 @@ const CampusMapMVP: React.FC = () => {
             <div
               className="absolute w-3 h-3 bg-white border border-gray-100 transform rotate-45"
               style={{
-                left: selectedRoom.x < 50 ? '-6px' : 'auto',
-                right: selectedRoom.x >= 50 ? '-6px' : 'auto',
-                top: '50%',
-                marginTop: '-6px',
-                zIndex: -1
+                left: selectedRoom.x < 50 ? "-6px" : "auto",
+                right: selectedRoom.x >= 50 ? "-6px" : "auto",
+                top: "50%",
+                marginTop: "-6px",
+                zIndex: -1,
               }}
             />
           </div>
@@ -799,7 +851,9 @@ const CampusMapMVP: React.FC = () => {
                 </div>
                 {tempPathPoints.length > 0 && (
                   <div className="text-xs bg-orange-600/50 p-2 rounded">
-                    Último ponto: ({tempPathPoints[tempPathPoints.length - 1].x.toFixed(1)}, {tempPathPoints[tempPathPoints.length - 1].y.toFixed(1)})
+                    Último ponto: (
+                    {tempPathPoints[tempPathPoints.length - 1].x.toFixed(1)},{" "}
+                    {tempPathPoints[tempPathPoints.length - 1].y.toFixed(1)})
                   </div>
                 )}
 
@@ -808,29 +862,39 @@ const CampusMapMVP: React.FC = () => {
                   const validation = validateCurrentPath(tempPathPoints);
                   return (
                     <div className="space-y-1">
-                      {validation.errors.length === 0 && tempPathPoints.length === 0 && (
-                        <div className="text-xs text-blue-200 bg-blue-600/50 p-1 rounded">
-                          💡 Clique no mapa para começar a adicionar pontos do caminho
-                        </div>
-                      )}
+                      {validation.errors.length === 0 &&
+                        tempPathPoints.length === 0 && (
+                          <div className="text-xs text-blue-200 bg-blue-600/50 p-1 rounded">
+                            💡 Clique no mapa para começar a adicionar pontos do
+                            caminho
+                          </div>
+                        )}
                       {validation.errors.map((error, index) => (
-                        <div key={index} className="text-xs text-red-200 bg-red-600/50 p-1 rounded">
+                        <div
+                          key={index}
+                          className="text-xs text-red-200 bg-red-600/50 p-1 rounded"
+                        >
                           ⚠️ {error}
                         </div>
                       ))}
                       {validation.warnings.map((warning, index) => (
-                        <div key={index} className="text-xs text-yellow-200 bg-yellow-600/50 p-1 rounded">
+                        <div
+                          key={index}
+                          className="text-xs text-yellow-200 bg-yellow-600/50 p-1 rounded"
+                        >
                           ⚡ {warning}
                         </div>
                       ))}
                       {validation.isValid && tempPathPoints.length >= 2 && (
                         <div className="text-xs text-green-200 bg-green-600/50 p-1 rounded">
-                          ✅ Pronto! Clique em uma sala para finalizar ou use o botão "Finalizar"
+                          ✅ Pronto! Clique em uma sala para finalizar ou use o
+                          botão "Finalizar"
                         </div>
                       )}
                       {validation.isValid && tempPathPoints.length === 1 && (
                         <div className="text-xs text-blue-200 bg-blue-600/50 p-1 rounded">
-                          📍 Adicione mais pontos ou clique em uma sala para finalizar
+                          📍 Adicione mais pontos ou clique em uma sala para
+                          finalizar
                         </div>
                       )}
                     </div>
@@ -842,7 +906,6 @@ const CampusMapMVP: React.FC = () => {
                 <button
                   onClick={() => {
                     if (tempPathPoints.length >= 2) {
-                      // Como não temos mais customPaths, apenas mostramos uma mensagem
                       alert(`Caminho criado com sucesso!`);
                       setTempPathPoints([]);
                       setIsCreatingPath(false);
@@ -870,8 +933,6 @@ const CampusMapMVP: React.FC = () => {
               </div>
             </div>
           )}
-
-
 
           <button
             onClick={handleZoomIn}
@@ -968,18 +1029,25 @@ const CampusMapMVP: React.FC = () => {
                   <div
                     key={room.id}
                     onClick={() => handleRoomClick(room)}
-                    className={`p-4 rounded-xl border cursor-pointer transition-all duration-200 hover:shadow-lg transform hover:-translate-y-1 ${isSelected
-                      ? 'border-blue-500 bg-blue-50 shadow-lg ring-2 ring-blue-200'
-                      : 'border-gray-200 bg-white hover:shadow-md'
-                      }`}
+                    className={`p-4 rounded-xl border cursor-pointer transition-all duration-200 hover:shadow-lg transform hover:-translate-y-1 ${
+                      isSelected
+                        ? "border-blue-500 bg-blue-50 shadow-lg ring-2 ring-blue-200"
+                        : "border-gray-200 bg-white hover:shadow-md"
+                    }`}
                   >
                     <div className="flex items-start justify-between mb-3">
                       <div className="flex-1">
                         <div className="flex items-center gap-2 mb-1">
-                          {React.createElement(getRoomIcon(room.type), { className: "w-5 h-5 text-blue-600" })}
-                          <h3 className="font-bold text-gray-900">{room.name}</h3>
+                          {React.createElement(getRoomIcon(room.type), {
+                            className: "w-5 h-5 text-blue-600",
+                          })}
+                          <h3 className="font-bold text-gray-900">
+                            {room.name}
+                          </h3>
                         </div>
-                        <p className="text-sm text-gray-600 mb-2">{room.description}</p>
+                        <p className="text-sm text-gray-600 mb-2">
+                          {room.description}
+                        </p>
 
                         <div className="grid grid-cols-2 gap-4 text-sm text-gray-600">
                           <div className="flex items-center gap-2">
@@ -996,25 +1064,41 @@ const CampusMapMVP: React.FC = () => {
                           </div>
                           <div className="flex items-center gap-2">
                             <span className="text-xs">📍</span>
-                            <span>({room.x.toFixed(1)}, {room.y.toFixed(1)})</span>
+                            <span>
+                              ({room.x.toFixed(1)}, {room.y.toFixed(1)})
+                            </span>
                           </div>
                         </div>
                       </div>
 
                       <div className="flex flex-col items-end gap-2 ml-4">
                         <div className="text-right">
-                          <div className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium capitalize ${room.type === 'classroom' ? 'bg-blue-100 text-blue-800' :
-                            room.type === 'lab' ? 'bg-purple-100 text-purple-800' :
-                              room.type === 'library' ? 'bg-green-100 text-green-800' :
-                                room.type === 'auditorium' ? 'bg-orange-100 text-orange-800' :
-                                  room.type === 'restaurant' ? 'bg-red-100 text-red-800' :
-                                    'bg-gray-100 text-gray-800'
-                            }`}>
-                            {room.type === 'classroom' ? 'Sala de Aula' :
-                             room.type === 'lab' ? 'Laboratório' :
-                             room.type === 'library' ? 'Biblioteca' :
-                             room.type === 'auditorium' ? 'Auditório' :
-                             room.type === 'restaurant' ? 'Cantina' : 'Escritório'}
+                          <div
+                            className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium capitalize ${
+                              room.type === "classroom"
+                                ? "bg-blue-100 text-blue-800"
+                                : room.type === "lab"
+                                ? "bg-purple-100 text-purple-800"
+                                : room.type === "library"
+                                ? "bg-green-100 text-green-800"
+                                : room.type === "auditorium"
+                                ? "bg-orange-100 text-orange-800"
+                                : room.type === "restaurant"
+                                ? "bg-red-100 text-red-800"
+                                : "bg-gray-100 text-gray-800"
+                            }`}
+                          >
+                            {room.type === "classroom"
+                              ? "Sala de Aula"
+                              : room.type === "lab"
+                              ? "Laboratório"
+                              : room.type === "library"
+                              ? "Biblioteca"
+                              : room.type === "auditorium"
+                              ? "Auditório"
+                              : room.type === "restaurant"
+                              ? "Cantina"
+                              : "Escritório"}
                           </div>
                         </div>
                       </div>
@@ -1025,7 +1109,10 @@ const CampusMapMVP: React.FC = () => {
                       <div className="mb-3">
                         <div className="flex flex-wrap gap-1">
                           {room.amenities.map((amenity, index) => (
-                            <span key={index} className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full font-medium">
+                            <span
+                              key={index}
+                              className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full font-medium"
+                            >
                               {amenity}
                             </span>
                           ))}
@@ -1038,7 +1125,9 @@ const CampusMapMVP: React.FC = () => {
                       <div className="mt-3 pt-3 border-t border-gray-200">
                         <div className="flex items-center gap-2 text-sm text-green-600">
                           <Navigation className="w-4 h-4" />
-                          <span className="font-medium">Caminho disponível - {room.path.length} pontos</span>
+                          <span className="font-medium">
+                            Caminho disponível - {room.path.length} pontos
+                          </span>
                         </div>
                       </div>
                     )}
@@ -1065,15 +1154,16 @@ const CampusMapMVP: React.FC = () => {
             <div className="flex items-center gap-4">
               <span className="flex items-center gap-1">
                 <div className="w-2 h-2 rounded-full bg-blue-500"></div>
-                {rooms.filter(r => r.type === 'classroom').length} Salas de Aula
+                {rooms.filter((r) => r.type === "classroom").length} Salas de
+                Aula
               </span>
               <span className="flex items-center gap-1">
                 <div className="w-2 h-2 rounded-full bg-purple-500"></div>
-                {rooms.filter(r => r.type === 'lab').length} Laboratórios
+                {rooms.filter((r) => r.type === "lab").length} Laboratórios
               </span>
               <span className="flex items-center gap-1">
                 <div className="w-2 h-2 rounded-full bg-green-500"></div>
-                {rooms.filter(r => r.type === 'library').length} Bibliotecas
+                {rooms.filter((r) => r.type === "library").length} Bibliotecas
               </span>
             </div>
             <div className="text-xs text-gray-400">
@@ -1086,16 +1176,21 @@ const CampusMapMVP: React.FC = () => {
   );
 };
 
-// Componente do Painel de Edição
 interface EditRoomPanelProps {
   room: Room;
   onSave: (room: Room) => void;
-  onDelete: (roomId: string) => void;
+  onDelete: (roomId: number) => void;
   onCancel: () => void;
   onStartPath: (room: Room) => void;
 }
 
-const EditRoomPanel: React.FC<EditRoomPanelProps> = ({ room, onSave, onDelete, onCancel, onStartPath }) => {
+const EditRoomPanel: React.FC<EditRoomPanelProps> = ({
+  room,
+  onSave,
+  onDelete,
+  onCancel,
+  onStartPath,
+}) => {
   const [editedRoom, setEditedRoom] = useState<Room>({ ...room });
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
@@ -1110,28 +1205,39 @@ const EditRoomPanel: React.FC<EditRoomPanelProps> = ({ room, onSave, onDelete, o
           <Edit3 className="w-5 h-5" />
           Editar Local
         </h3>
-        <button onClick={onCancel} className="text-gray-400 hover:text-gray-600">
+        <button
+          onClick={onCancel}
+          className="text-gray-400 hover:text-gray-600"
+        >
           <X className="w-5 h-5" />
         </button>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Nome</label>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Nome
+          </label>
           <input
             type="text"
             value={editedRoom.name}
-            onChange={(e) => setEditedRoom({ ...editedRoom, name: e.target.value })}
+            onChange={(e) =>
+              setEditedRoom({ ...editedRoom, name: e.target.value })
+            }
             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             required
           />
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Descrição</label>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Descrição
+          </label>
           <textarea
             value={editedRoom.description}
-            onChange={(e) => setEditedRoom({ ...editedRoom, description: e.target.value })}
+            onChange={(e) =>
+              setEditedRoom({ ...editedRoom, description: e.target.value })
+            }
             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             rows={2}
           />
@@ -1139,10 +1245,17 @@ const EditRoomPanel: React.FC<EditRoomPanelProps> = ({ room, onSave, onDelete, o
 
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Tipo</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Tipo
+            </label>
             <select
               value={editedRoom.type}
-              onChange={(e) => setEditedRoom({ ...editedRoom, type: e.target.value as RoomType })}
+              onChange={(e) =>
+                setEditedRoom({
+                  ...editedRoom,
+                  type: e.target.value as RoomType,
+                })
+              }
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="classroom">Sala de Aula</option>
@@ -1155,11 +1268,18 @@ const EditRoomPanel: React.FC<EditRoomPanelProps> = ({ room, onSave, onDelete, o
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Capacidade</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Capacidade
+            </label>
             <input
               type="number"
               value={editedRoom.capacity}
-              onChange={(e) => setEditedRoom({ ...editedRoom, capacity: parseInt(e.target.value) || 1 })}
+              onChange={(e) =>
+                setEditedRoom({
+                  ...editedRoom,
+                  capacity: parseInt(e.target.value) || 1,
+                })
+              }
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               min={1}
             />
@@ -1168,22 +1288,33 @@ const EditRoomPanel: React.FC<EditRoomPanelProps> = ({ room, onSave, onDelete, o
 
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Prédio</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Prédio
+            </label>
             <input
               type="text"
               value={editedRoom.building}
-              onChange={(e) => setEditedRoom({ ...editedRoom, building: e.target.value })}
+              onChange={(e) =>
+                setEditedRoom({ ...editedRoom, building: e.target.value })
+              }
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               maxLength={1}
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Andar</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Andar
+            </label>
             <input
               type="number"
               value={editedRoom.floor}
-              onChange={(e) => setEditedRoom({ ...editedRoom, floor: parseInt(e.target.value) || 1 })}
+              onChange={(e) =>
+                setEditedRoom({
+                  ...editedRoom,
+                  floor: parseInt(e.target.value) || 1,
+                })
+              }
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               min={1}
             />
@@ -1191,14 +1322,21 @@ const EditRoomPanel: React.FC<EditRoomPanelProps> = ({ room, onSave, onDelete, o
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Recursos (separados por vírgula)</label>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Recursos (separados por vírgula)
+          </label>
           <input
             type="text"
-            value={editedRoom.amenities ? editedRoom.amenities.join(', ') : ''}
-            onChange={(e) => setEditedRoom({
-              ...editedRoom,
-              amenities: e.target.value.split(',').map(item => item.trim()).filter(item => item)
-            })}
+            value={editedRoom.amenities ? editedRoom.amenities.join(", ") : ""}
+            onChange={(e) =>
+              setEditedRoom({
+                ...editedRoom,
+                amenities: e.target.value
+                  .split(",")
+                  .map((item) => item.trim())
+                  .filter((item) => item),
+              })
+            }
             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             placeholder="Ex: Projetor, Ar condicionado, Wi-Fi"
           />

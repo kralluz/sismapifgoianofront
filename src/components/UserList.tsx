@@ -1,59 +1,64 @@
-import React, { useState, useEffect } from 'react';
-import { Users, Plus, Search, Trash2, UserCheck, AlertCircle, Shield } from 'lucide-react';
-import { useAuth } from '../provider/AuthContext';
-import type { User, RegisterRequest } from '../types';
+import React, { useState, useEffect } from "react";
+import {
+  Users,
+  Plus,
+  Search,
+  Trash2,
+  UserCheck,
+  AlertCircle,
+  Shield,
+} from "lucide-react";
+import { useAuth } from "../provider/AuthContext";
+import type { User, RegisterRequest } from "../types";
 
 const UserList: React.FC = () => {
   const { user: currentUser } = useAuth();
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [searchTerm, setSearchTerm] = useState('');
+  const [searchTerm, setSearchTerm] = useState("");
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
 
-  // Estados para o formulário de criação/edição
   const [formData, setFormData] = useState<RegisterRequest>({
-    nome: '',
-    email: '',
-    senha: '',
-    role: 'user',
-    adminEmail: '',
-    adminSenha: ''
+    nome: "",
+    email: "",
+    senha: "",
+    role: "user",
+    adminEmail: "",
+    adminSenha: "",
   });
 
-  // Simular dados de usuários (em produção, isso viria da API)
   useEffect(() => {
     const loadUsers = async () => {
       try {
         setLoading(true);
-        // Simular uma chamada à API
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        
-        // Dados mockados
+
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+
         const mockUsers: User[] = [
           {
             id: 1,
-            nome: 'João Silva',
-            email: 'joao@ifgoiano.edu.br',
-            role: 'admin'
+            nome: "João Silva",
+            email: "joao@ifgoiano.edu.br",
+            role: "admin",
           },
           {
             id: 2,
-            nome: 'Maria Santos',
-            email: 'maria@ifgoiano.edu.br',
-            role: 'user'
+            nome: "Maria Santos",
+            email: "maria@ifgoiano.edu.br",
+            role: "user",
           },
           {
             id: 3,
-            nome: 'Pedro Oliveira',
-            email: 'pedro@ifgoiano.edu.br',
-            role: 'user'
-          }
+            nome: "Pedro Oliveira",
+            email: "pedro@ifgoiano.edu.br",
+            role: "user",
+          },
         ];
-        
+
         setUsers(mockUsers);
       } catch (err) {
-        setError('Erro ao carregar usuários');
+        setError("Erro ao carregar usuários");
       } finally {
         setLoading(false);
       }
@@ -62,52 +67,49 @@ const UserList: React.FC = () => {
     loadUsers();
   }, []);
 
-  // Filtrar usuários baseado na busca
-  const filteredUsers = users.filter(user =>
-    user.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    user.role.toLowerCase().includes(searchTerm.toLowerCase())
+  const filteredUsers = users.filter(
+    (user) =>
+      user.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      user.role.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const handleCreateUser = async () => {
     try {
       setLoading(true);
-      
-      // Validações básicas
+
       if (!formData.nome || !formData.email || !formData.senha) {
-        setError('Todos os campos são obrigatórios');
+        setError("Todos os campos são obrigatórios");
         return;
       }
 
       if (!formData.adminEmail || !formData.adminSenha) {
-        setError('Credenciais de administrador são obrigatórias');
+        setError("Credenciais de administrador são obrigatórias");
         return;
       }
 
-      // Simular criação do usuário
       const newUser: User = {
-        id: Math.max(...users.map(u => u.id)) + 1,
+        id: Math.max(...users.map((u) => u.id)) + 1,
         nome: formData.nome,
         email: formData.email,
-        role: formData.role
+        role: formData.role,
       };
 
-      setUsers(prev => [...prev, newUser]);
-      
-      // Resetar formulário
+      setUsers((prev) => [...prev, newUser]);
+
       setFormData({
-        nome: '',
-        email: '',
-        senha: '',
-        role: 'user',
-        adminEmail: '',
-        adminSenha: ''
+        nome: "",
+        email: "",
+        senha: "",
+        role: "user",
+        adminEmail: "",
+        adminSenha: "",
       });
-      
+
       setIsCreateModalOpen(false);
       setError(null);
     } catch (err) {
-      setError('Erro ao criar usuário');
+      setError("Erro ao criar usuário");
     } finally {
       setLoading(false);
     }
@@ -115,17 +117,17 @@ const UserList: React.FC = () => {
 
   const handleDeleteUser = async (userId: number) => {
     if (userId === currentUser?.id) {
-      setError('Você não pode deletar sua própria conta');
+      setError("Você não pode deletar sua própria conta");
       return;
     }
 
-    if (window.confirm('Tem certeza que deseja deletar este usuário?')) {
-      setUsers(prev => prev.filter(user => user.id !== userId));
+    if (window.confirm("Tem certeza que deseja deletar este usuário?")) {
+      setUsers((prev) => prev.filter((user) => user.id !== userId));
     }
   };
 
   const getRoleDisplay = (role: string) => {
-    return role === 'admin' ? (
+    return role === "admin" ? (
       <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
         <Shield className="w-3 h-3" />
         Administrador
@@ -138,13 +140,17 @@ const UserList: React.FC = () => {
     );
   };
 
-  if (currentUser?.role !== 'admin') {
+  if (currentUser?.role !== "admin") {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
           <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
-          <h2 className="text-xl font-semibold text-gray-900 mb-2">Acesso Negado</h2>
-          <p className="text-gray-600">Apenas administradores podem acessar esta página.</p>
+          <h2 className="text-xl font-semibold text-gray-900 mb-2">
+            Acesso Negado
+          </h2>
+          <p className="text-gray-600">
+            Apenas administradores podem acessar esta página.
+          </p>
         </div>
       </div>
     );
@@ -159,7 +165,9 @@ const UserList: React.FC = () => {
             <div className="flex items-center gap-3">
               <Users className="w-8 h-8 text-blue-600" />
               <div>
-                <h1 className="text-2xl font-bold text-gray-900">Gerenciar Usuários</h1>
+                <h1 className="text-2xl font-bold text-gray-900">
+                  Gerenciar Usuários
+                </h1>
                 <p className="text-gray-600">Administre usuários do sistema</p>
               </div>
             </div>
@@ -242,7 +250,9 @@ const UserList: React.FC = () => {
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900">{user.email}</div>
+                        <div className="text-sm text-gray-900">
+                          {user.email}
+                        </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         {getRoleDisplay(user.role)}
@@ -278,7 +288,7 @@ const UserList: React.FC = () => {
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
             <div className="bg-white rounded-lg max-w-md w-full p-6">
               <h3 className="text-lg font-semibold mb-4">Criar Novo Usuário</h3>
-              
+
               <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -287,7 +297,9 @@ const UserList: React.FC = () => {
                   <input
                     type="text"
                     value={formData.nome}
-                    onChange={(e) => setFormData({ ...formData, nome: e.target.value })}
+                    onChange={(e) =>
+                      setFormData({ ...formData, nome: e.target.value })
+                    }
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                     placeholder="Nome completo"
                   />
@@ -300,7 +312,9 @@ const UserList: React.FC = () => {
                   <input
                     type="email"
                     value={formData.email}
-                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                    onChange={(e) =>
+                      setFormData({ ...formData, email: e.target.value })
+                    }
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                     placeholder="email@ifgoiano.edu.br"
                   />
@@ -313,7 +327,9 @@ const UserList: React.FC = () => {
                   <input
                     type="password"
                     value={formData.senha}
-                    onChange={(e) => setFormData({ ...formData, senha: e.target.value })}
+                    onChange={(e) =>
+                      setFormData({ ...formData, senha: e.target.value })
+                    }
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                     placeholder="••••••••"
                   />
@@ -325,7 +341,9 @@ const UserList: React.FC = () => {
                   </label>
                   <select
                     value={formData.role}
-                    onChange={(e) => setFormData({ ...formData, role: e.target.value })}
+                    onChange={(e) =>
+                      setFormData({ ...formData, role: e.target.value })
+                    }
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                   >
                     <option value="user">Usuário</option>
@@ -337,19 +355,23 @@ const UserList: React.FC = () => {
                   <p className="text-yellow-800 text-sm font-medium mb-2">
                     Confirme suas credenciais de administrador:
                   </p>
-                  
+
                   <div className="space-y-2">
                     <input
                       type="email"
                       value={formData.adminEmail}
-                      onChange={(e) => setFormData({ ...formData, adminEmail: e.target.value })}
+                      onChange={(e) =>
+                        setFormData({ ...formData, adminEmail: e.target.value })
+                      }
                       className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
                       placeholder="Seu email de admin"
                     />
                     <input
                       type="password"
                       value={formData.adminSenha}
-                      onChange={(e) => setFormData({ ...formData, adminSenha: e.target.value })}
+                      onChange={(e) =>
+                        setFormData({ ...formData, adminSenha: e.target.value })
+                      }
                       className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
                       placeholder="Sua senha de admin"
                     />
@@ -362,12 +384,12 @@ const UserList: React.FC = () => {
                   onClick={() => {
                     setIsCreateModalOpen(false);
                     setFormData({
-                      nome: '',
-                      email: '',
-                      senha: '',
-                      role: 'user',
-                      adminEmail: '',
-                      adminSenha: ''
+                      nome: "",
+                      email: "",
+                      senha: "",
+                      role: "user",
+                      adminEmail: "",
+                      adminSenha: "",
                     });
                     setError(null);
                   }}
@@ -380,7 +402,7 @@ const UserList: React.FC = () => {
                   disabled={loading}
                   className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
                 >
-                  {loading ? 'Criando...' : 'Criar Usuário'}
+                  {loading ? "Criando..." : "Criar Usuário"}
                 </button>
               </div>
             </div>

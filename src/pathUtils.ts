@@ -1,38 +1,66 @@
-// Utilitários para manipulação de caminhos
-import type { Path, PathPoint, Room } from './types';
+import type { Path, PathPoint, Room } from "./types";
 
-// Pontos principais do sistema viário do campus
 export const CAMPUS_NODES = {
-  entrance: { x: 10, y: 10, type: 'entrance' as const, label: 'Entrada Principal' },
-  centralHub: { x: 50, y: 50, type: 'intersection' as const, label: 'Hub Central' },
-  northGate: { x: 50, y: 15, type: 'intersection' as const, label: 'Portão Norte' },
-  southGate: { x: 50, y: 85, type: 'intersection' as const, label: 'Portão Sul' },
-  eastGate: { x: 85, y: 50, type: 'intersection' as const, label: 'Portão Leste' },
-  westGate: { x: 15, y: 50, type: 'intersection' as const, label: 'Portão Oeste' }
+  entrance: {
+    x: 10,
+    y: 10,
+    type: "entrance" as const,
+    label: "Entrada Principal",
+  },
+  centralHub: {
+    x: 50,
+    y: 50,
+    type: "intersection" as const,
+    label: "Hub Central",
+  },
+  northGate: {
+    x: 50,
+    y: 15,
+    type: "intersection" as const,
+    label: "Portão Norte",
+  },
+  southGate: {
+    x: 50,
+    y: 85,
+    type: "intersection" as const,
+    label: "Portão Sul",
+  },
+  eastGate: {
+    x: 85,
+    y: 50,
+    type: "intersection" as const,
+    label: "Portão Leste",
+  },
+  westGate: {
+    x: 15,
+    y: 50,
+    type: "intersection" as const,
+    label: "Portão Oeste",
+  },
 } as const;
 
-// Cria um ponto de caminho padronizado
 export const createPathPoint = (
   x: number,
   y: number,
-  type: PathPoint['type'] = 'waypoint',
+  type: PathPoint["type"] = "waypoint",
   label?: string
 ): PathPoint => ({
   x,
   y,
   id: `point-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
   type,
-  label
+  label,
 });
 
-// Calcula a distância entre dois pontos
-export const calculateDistance = (point1: PathPoint, point2: PathPoint): number => {
+export const calculateDistance = (
+  point1: PathPoint,
+  point2: PathPoint
+): number => {
   const dx = point2.x - point1.x;
   const dy = point2.y - point1.y;
   return Math.sqrt(dx * dx + dy * dy);
 };
 
-// Calcula o tempo estimado baseado na distância (aproximadamente 1.4 m/s = velocidade de caminhada)
 export const calculateEstimatedTime = (points: PathPoint[]): number => {
   if (points.length < 2) return 0;
 
@@ -41,25 +69,24 @@ export const calculateEstimatedTime = (points: PathPoint[]): number => {
     totalDistance += calculateDistance(points[i], points[i + 1]);
   }
 
-  // Converte unidades do mapa para metros (assumindo 1 unidade = 2 metros)
   const distanceInMeters = totalDistance * 2;
-  // Tempo em minutos (velocidade média de caminhada: 1.4 m/s = 84 m/min)
+
   return Math.ceil(distanceInMeters / 84);
 };
 
-// Valida se um caminho é válido
-export const validatePath = (path: Path): { isValid: boolean; errors: string[] } => {
+export const validatePath = (
+  path: Path
+): { isValid: boolean; errors: string[] } => {
   const errors: string[] = [];
 
-  if (!path.id) errors.push('ID do caminho é obrigatório');
-  if (!path.roomId) errors.push('ID da sala é obrigatório');
+  if (!path.id) errors.push("ID do caminho é obrigatório");
+  if (!path.roomId) errors.push("ID da sala é obrigatório");
   if (!path.points || path.points.length < 2) {
-    errors.push('Caminho deve ter pelo menos 2 pontos');
+    errors.push("Caminho deve ter pelo menos 2 pontos");
   }
 
-  // Verifica se todos os pontos têm coordenadas válidas
   path.points?.forEach((point, index) => {
-    if (typeof point.x !== 'number' || typeof point.y !== 'number') {
+    if (typeof point.x !== "number" || typeof point.y !== "number") {
       errors.push(`Ponto ${index + 1} tem coordenadas inválidas`);
     }
     if (point.x < 0 || point.x > 100 || point.y < 0 || point.y > 100) {
@@ -69,44 +96,37 @@ export const validatePath = (path: Path): { isValid: boolean; errors: string[] }
 
   return {
     isValid: errors.length === 0,
-    errors
+    errors,
   };
 };
 
-// Cria um caminho automático baseado na localização da sala
 export const createAutomaticPath = (room: Room): Path => {
   const destination: PathPoint = {
-    ...createPathPoint(room.x, room.y, 'destination'),
-    label: room.name
+    ...createPathPoint(room.x, room.y, "destination"),
+    label: room.name,
   };
 
   const points: PathPoint[] = [
     { ...CAMPUS_NODES.entrance },
     { ...CAMPUS_NODES.westGate },
-    { ...CAMPUS_NODES.centralHub }
+    { ...CAMPUS_NODES.centralHub },
   ];
 
-  // Lógica de roteamento baseada na localização
   if (room.x < 40 && room.y < 50) {
-    // Quadrante Norte
     points.push({ ...CAMPUS_NODES.northGate });
   } else if (room.x > 60 && room.y < 50) {
-    // Quadrante Norte-Leste
     points.push({ ...CAMPUS_NODES.northGate });
     points.push({ ...CAMPUS_NODES.eastGate });
   } else if (room.x > 60 && room.y > 50) {
-    // Quadrante Leste
     points.push({ ...CAMPUS_NODES.eastGate });
   } else if (room.x < 40 && room.y > 50) {
-    // Quadrante Sul/Oeste
     points.push({ ...CAMPUS_NODES.southGate });
   }
 
-  // Adiciona ponto de aproximação
   const approachPoint = createPathPoint(
     room.x,
     room.y - 3,
-    'waypoint',
+    "waypoint",
     `Aproximação para ${room.name}`
   );
   points.push(approachPoint);
@@ -118,51 +138,49 @@ export const createAutomaticPath = (room: Room): Path => {
     name: `Caminho automático para ${room.name}`,
     description: `Rota otimizada gerada automaticamente`,
     points,
-    type: 'automatic',
+    type: "automatic",
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
     isActive: true,
     estimatedTime: calculateEstimatedTime(points),
-    distance: points.reduce((total, point, index) => {
-      if (index === 0) return total;
-      return total + calculateDistance(points[index - 1], point);
-    }, 0) * 2 // Converte para metros
+    distance:
+      points.reduce((total, point, index) => {
+        if (index === 0) return total;
+        return total + calculateDistance(points[index - 1], point);
+      }, 0) * 2,
   };
 
   return path;
 };
 
-// Encontra o melhor caminho para uma sala (prioriza customizados)
-export const findBestPath = (roomId: string, customPaths: Path[]): Path | null => {
-  // Primeiro tenta encontrar caminho customizado
-  const customPath = customPaths.find(path =>
-    path.roomId === roomId && path.isActive
+export const findBestPath = (
+  roomId: number,
+  customPaths: Path[]
+): Path | null => {
+  const customPath = customPaths.find(
+    (path) => path.roomId === roomId && path.isActive
   );
 
   return customPath || null;
 };
 
-// Otimiza um caminho removendo pontos desnecessários
 export const optimizePath = (path: Path): Path => {
   if (path.points.length <= 3) return path;
 
-  const optimizedPoints: PathPoint[] = [path.points[0]]; // Sempre mantém o primeiro ponto
+  const optimizedPoints: PathPoint[] = [path.points[0]];
 
   for (let i = 1; i < path.points.length - 1; i++) {
     const prevPoint = optimizedPoints[optimizedPoints.length - 1];
     const currentPoint = path.points[i];
     const nextPoint = path.points[i + 1];
 
-    // Calcula se o ponto atual é necessário (ângulo significativo)
     const angle = calculatePathAngle(prevPoint, currentPoint, nextPoint);
 
-    // Mantém pontos importantes ou com ângulo significativo
-    if (currentPoint.type !== 'waypoint' || Math.abs(angle) > 30) {
+    if (currentPoint.type !== "waypoint" || Math.abs(angle) > 30) {
       optimizedPoints.push(currentPoint);
     }
   }
 
-  // Sempre mantém o último ponto (destino)
   optimizedPoints.push(path.points[path.points.length - 1]);
 
   return {
@@ -170,15 +188,19 @@ export const optimizePath = (path: Path): Path => {
     points: optimizedPoints,
     updatedAt: new Date().toISOString(),
     estimatedTime: calculateEstimatedTime(optimizedPoints),
-    distance: optimizedPoints.reduce((total, point, index) => {
-      if (index === 0) return total;
-      return total + calculateDistance(optimizedPoints[index - 1], point);
-    }, 0) * 2
+    distance:
+      optimizedPoints.reduce((total, point, index) => {
+        if (index === 0) return total;
+        return total + calculateDistance(optimizedPoints[index - 1], point);
+      }, 0) * 2,
   };
 };
 
-// Calcula o ângulo entre três pontos
-const calculatePathAngle = (point1: PathPoint, point2: PathPoint, point3: PathPoint): number => {
+const calculatePathAngle = (
+  point1: PathPoint,
+  point2: PathPoint,
+  point3: PathPoint
+): number => {
   const vector1 = { x: point2.x - point1.x, y: point2.y - point1.y };
   const vector2 = { x: point3.x - point2.x, y: point3.y - point2.y };
 
@@ -187,30 +209,32 @@ const calculatePathAngle = (point1: PathPoint, point2: PathPoint, point3: PathPo
   const magnitude2 = Math.sqrt(vector2.x ** 2 + vector2.y ** 2);
 
   const cosAngle = dotProduct / (magnitude1 * magnitude2);
-  const angle = Math.acos(Math.max(-1, Math.min(1, cosAngle))) * (180 / Math.PI);
+  const angle =
+    Math.acos(Math.max(-1, Math.min(1, cosAngle))) * (180 / Math.PI);
 
   return angle;
 };
 
-// Converte array simples [x,y] para PathPoint
-export const convertSimplePointsToPathPoints = (simplePoints: number[][], roomName?: string): PathPoint[] => {
+export const convertSimplePointsToPathPoints = (
+  simplePoints: number[][],
+  roomName?: string
+): PathPoint[] => {
   return simplePoints.map((point, index) => {
-    let type: PathPoint['type'] = 'waypoint';
-    let label = '';
+    let type: PathPoint["type"] = "waypoint";
+    let label = "";
 
     if (index === 0) {
-      type = 'entrance';
-      label = 'Entrada Principal';
+      type = "entrance";
+      label = "Entrada Principal";
     } else if (index === simplePoints.length - 1) {
-      type = 'destination';
-      label = roomName || 'Destino';
+      type = "destination";
+      label = roomName || "Destino";
     }
 
     return createPathPoint(point[0], point[1], type, label);
   });
 };
 
-// Converte PathPoint para array simples [x,y]
 export const convertPathPointsToSimple = (points: PathPoint[]): number[][] => {
-  return points.map(point => [point.x, point.y]);
+  return points.map((point) => [point.x, point.y]);
 };

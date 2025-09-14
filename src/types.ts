@@ -2,17 +2,19 @@
 export type RoomType = 'classroom' | 'lab' | 'library' | 'auditorium' | 'restaurant' | 'office';
 
 export interface Room {
-  id: string;
+  id: number;
   name: string;
   x: number;
   y: number;
   description: string;
   capacity: number;
-  type: RoomType;
+  type: string;
   floor: number;
   building: string;
   amenities: string[];
   path?: number[][];
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface Event {
@@ -38,7 +40,7 @@ export interface PathPoint {
 
 export interface Path {
   id: string;
-  roomId: string;
+  roomId: number;
   name?: string;
   description?: string;
   points: PathPoint[];
@@ -96,6 +98,8 @@ export interface AuthResponse {
   nome: string;
   email: string;
   role: string;
+  token: string;
+  isFirstLogin?: boolean;
 }
 
 export interface AuthContextType {
@@ -107,4 +111,71 @@ export interface AuthContextType {
   logout: () => void;
   error: string | null;
   clearError: () => void;
+}
+
+// Tipos para Rooms
+export interface CreateRoomRequest {
+  name: string;
+  x: number;
+  y: number;
+  description: string;
+  capacity: number;
+  type: string;
+  floor: number;
+  building: string;
+  amenities: string[];
+  path?: number[][];
+}
+
+export interface UpdateRoomRequest extends Partial<CreateRoomRequest> {}
+
+export interface RoomContextType {
+  rooms: Room[];
+  currentRoom: Room | null;
+  isLoading: boolean;
+  error: string | null;
+  fetchRooms: () => Promise<void>;
+  fetchRoom: (id: number) => Promise<void>;
+  createRoom: (roomData: CreateRoomRequest) => Promise<Room>;
+  updateRoom: (id: number, roomData: UpdateRoomRequest) => Promise<Room>;
+  deleteRoom: (id: number) => Promise<void>;
+  clearError: () => void;
+  setCurrentRoom: (room: Room | null) => void;
+}
+
+// Tipos para Projects
+export interface Project {
+  id: number;
+  title: string;
+  type: string;
+  startAt: string;
+  endAt: string;
+  roomId: number;
+  room?: Room;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface CreateProjectRequest {
+  title: string;
+  type: string;
+  startAt: string;
+  endAt: string;
+  roomId: number;
+}
+
+export interface UpdateProjectRequest extends Partial<CreateProjectRequest> {}
+
+export interface ProjectContextType {
+  projects: Project[];
+  currentProject: Project | null;
+  isLoading: boolean;
+  error: string | null;
+  fetchProjects: () => Promise<void>;
+  fetchProject: (id: number) => Promise<void>;
+  createProject: (projectData: CreateProjectRequest) => Promise<Project>;
+  updateProject: (id: number, projectData: UpdateProjectRequest) => Promise<Project>;
+  deleteProject: (id: number) => Promise<void>;
+  clearError: () => void;
+  setCurrentProject: (project: Project | null) => void;
 }

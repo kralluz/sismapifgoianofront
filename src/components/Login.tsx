@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { MapPin, Mail, Lock, Eye, EyeOff } from 'lucide-react';
-import { useAuth } from '../provider/AuthContext';
+import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import { MapPin, Mail, Lock, Eye, EyeOff } from "lucide-react";
+import { useAuth } from "../provider/AuthContext";
 
 interface LoginProps {
   onLogin?: (token: string, user: any) => void;
@@ -9,77 +9,67 @@ interface LoginProps {
 
 const Login: React.FC<LoginProps> = ({ onLogin }) => {
   const navigate = useNavigate();
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [isRegisterMode, setIsRegisterMode] = useState(false);
-  
-  // Estados para registro
+
   const [registerData, setRegisterData] = useState({
-    nome: '',
-    email: '',
-    senha: '',
-    role: 'user',
-    adminEmail: '',
-    adminSenha: ''
+    nome: "",
+    email: "",
+    senha: "",
+    role: "user",
+    adminEmail: "",
+    adminSenha: "",
   });
 
   const { login, register, isLoading, error, clearError } = useAuth();
 
-  // Limpar erros quando mudar de modo
   useEffect(() => {
     clearError();
   }, [isRegisterMode, clearError]);
 
   const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     try {
       const response = await login(email, password);
-      
-      // Se tem onLogin (compatibilidade), chama a função
+
       if (onLogin) {
-        onLogin('user-logged-in', response);
+        onLogin("user-logged-in", response);
       } else {
-        // Senão, navega para a página principal
-        navigate('/');
+        navigate("/");
       }
-    } catch (err) {
-      // Erro já é gerenciado pelo contexto
-    }
+    } catch (err) {}
   };
 
   const handleRegisterSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     try {
       const response = await register(registerData);
-      
-      // Se tem onLogin (compatibilidade), chama a função
+
       if (onLogin) {
-        onLogin('user-logged-in', response);
+        onLogin("user-logged-in", response);
       } else {
-        // Senão, navega para a página principal
-        navigate('/');
+        navigate("/");
       }
-    } catch (err) {
-      // Erro já é gerenciado pelo contexto
-    }
+    } catch (err) {}
   };
 
   const toggleMode = () => {
     setIsRegisterMode(!isRegisterMode);
     clearError();
-    // Limpar formulários
-    setEmail('');
-    setPassword('');
+
+    setEmail("");
+    setPassword("");
     setRegisterData({
-      nome: '',
-      email: '',
-      senha: '',
-      role: 'user',
-      adminEmail: '',
-      adminSenha: ''
+      nome: "",
+      email: "",
+      senha: "",
+      role: "user",
+      adminEmail: "",
+      adminSenha: "",
     });
   };
 
@@ -92,7 +82,9 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
             <h1 className="text-2xl font-bold text-gray-900">SisMap IF</h1>
           </div>
           <p className="text-gray-600">
-            {isRegisterMode ? 'Criar nova conta' : 'Faça login para acessar o mapa do campus'}
+            {isRegisterMode
+              ? "Criar nova conta"
+              : "Faça login para acessar o mapa do campus"}
           </p>
         </div>
 
@@ -123,7 +115,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
               <div className="relative">
                 <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
                 <input
-                  type={showPassword ? 'text' : 'password'}
+                  type={showPassword ? "text" : "password"}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   className="w-full pl-10 pr-12 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -135,7 +127,11 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
                   onClick={() => setShowPassword(!showPassword)}
                   className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
                 >
-                  {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                  {showPassword ? (
+                    <EyeOff className="w-5 h-5" />
+                  ) : (
+                    <Eye className="w-5 h-5" />
+                  )}
                 </button>
               </div>
             </div>
@@ -151,7 +147,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
               disabled={isLoading}
               className="w-full bg-blue-600 text-white py-3 rounded-lg font-medium hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
-              {isLoading ? 'Entrando...' : 'Entrar'}
+              {isLoading ? "Entrando..." : "Entrar"}
             </button>
 
             <div className="text-center">
@@ -176,7 +172,9 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
               <input
                 type="text"
                 value={registerData.nome}
-                onChange={(e) => setRegisterData({...registerData, nome: e.target.value})}
+                onChange={(e) =>
+                  setRegisterData({ ...registerData, nome: e.target.value })
+                }
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 placeholder="João Silva"
                 required
@@ -192,7 +190,9 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
                 <input
                   type="email"
                   value={registerData.email}
-                  onChange={(e) => setRegisterData({...registerData, email: e.target.value})}
+                  onChange={(e) =>
+                    setRegisterData({ ...registerData, email: e.target.value })
+                  }
                   className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   placeholder="seu@email.com"
                   required
@@ -207,9 +207,11 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
               <div className="relative">
                 <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
                 <input
-                  type={showPassword ? 'text' : 'password'}
+                  type={showPassword ? "text" : "password"}
                   value={registerData.senha}
-                  onChange={(e) => setRegisterData({...registerData, senha: e.target.value})}
+                  onChange={(e) =>
+                    setRegisterData({ ...registerData, senha: e.target.value })
+                  }
                   className="w-full pl-10 pr-12 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   placeholder="••••••••"
                   required
@@ -219,7 +221,11 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
                   onClick={() => setShowPassword(!showPassword)}
                   className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
                 >
-                  {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                  {showPassword ? (
+                    <EyeOff className="w-5 h-5" />
+                  ) : (
+                    <Eye className="w-5 h-5" />
+                  )}
                 </button>
               </div>
             </div>
@@ -230,7 +236,9 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
               </label>
               <select
                 value={registerData.role}
-                onChange={(e) => setRegisterData({...registerData, role: e.target.value})}
+                onChange={(e) =>
+                  setRegisterData({ ...registerData, role: e.target.value })
+                }
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               >
                 <option value="user">Usuário</option>
@@ -242,7 +250,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
               <p className="text-yellow-800 text-sm font-medium mb-3">
                 Credenciais do Administrador (obrigatório)
               </p>
-              
+
               <div className="space-y-3">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -251,13 +259,18 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
                   <input
                     type="email"
                     value={registerData.adminEmail}
-                    onChange={(e) => setRegisterData({...registerData, adminEmail: e.target.value})}
+                    onChange={(e) =>
+                      setRegisterData({
+                        ...registerData,
+                        adminEmail: e.target.value,
+                      })
+                    }
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     placeholder="admin@email.com"
                     required
                   />
                 </div>
-                
+
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Senha do Admin
@@ -265,7 +278,12 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
                   <input
                     type="password"
                     value={registerData.adminSenha}
-                    onChange={(e) => setRegisterData({...registerData, adminSenha: e.target.value})}
+                    onChange={(e) =>
+                      setRegisterData({
+                        ...registerData,
+                        adminSenha: e.target.value,
+                      })
+                    }
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     placeholder="••••••••"
                     required
@@ -285,7 +303,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
               disabled={isLoading}
               className="w-full bg-green-600 text-white py-3 rounded-lg font-medium hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
-              {isLoading ? 'Registrando...' : 'Registrar'}
+              {isLoading ? "Registrando..." : "Registrar"}
             </button>
 
             <div className="text-center">
