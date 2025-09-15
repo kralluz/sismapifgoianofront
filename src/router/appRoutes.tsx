@@ -1,50 +1,54 @@
-import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { useAuth } from '../provider/AuthContext';
-import CampusMapMVP from '../CampusMap';
-import Login from '../components/Login';
-import UserList from '../components/UserList';
-import Layout from '../components/Layout';
+import React from "react";
+import {
+  BrowserRouter as Router,
+  Routes,
+  Route,
+  Navigate,
+} from "react-router-dom";
+import { useAuth } from "../provider/AuthContext";
+/// import Login from "../components/Login";
+import CampusMapMVP from "../CampusMap";
+import UserList from "../components/UserList";
+import Layout from "../components/Layout";
 
 const AppRoutes: React.FC = () => {
-  const { isAuthenticated, user } = useAuth();
+  const { user } = useAuth();
 
   return (
     <Router>
       <Routes>
         {/* Rota de Login - Pública */}
-        <Route 
-          path="/login" 
-          element={
-            isAuthenticated ? <Navigate to="/" replace /> : <Login />
-          } 
+        <Route
+          path="/login"
+          // element={isAuthenticated ? <Navigate to="/" replace /> : <Login />}
+          element={<Navigate to="/" />}
         />
 
         {/* Rotas Protegidas com Layout */}
         <Route
           path="/"
           element={
-            isAuthenticated ? (
-              <Layout />
-            ) : (
+            // isAuthenticated ? (
+            <Layout />
+            /* ) : (
               <Navigate to="/login" replace />
-            )
+            ) */
           }
         >
           {/* Rotas filhas que serão renderizadas dentro do Layout */}
           <Route index element={<CampusMapMVP />} />
           <Route path="mapa" element={<CampusMapMVP />} />
-          
+
           {/* Administração - Apenas ADMs */}
-          <Route 
-            path="usuarios" 
+          <Route
+            path="usuarios"
             element={
-              user?.role === 'admin' ? (
+              user?.role === "admin" ? (
                 <UserList />
               ) : (
                 <Navigate to="/" replace />
               )
-            } 
+            }
           />
         </Route>
 

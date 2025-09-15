@@ -1,8 +1,42 @@
 #root {
-  max-width: 1280px;
-  margin: 0 auto;
-  padding: 2rem;
-  text-align: center;
+  width: 100%;
+  height: 100vh;
+  margin: 0;
+  padding: 0;
+}
+
+/* Responsive Typography Scale */
+:root {
+  /* base fluid scale using clamp(min, vw factor, max) */
+  --step--2: clamp(0.65rem, 0.72rem + 0.2vw, 0.75rem);
+  --step--1: clamp(0.75rem, 0.78rem + 0.25vw, 0.85rem);
+  --step-0: clamp(0.875rem, 0.9rem + 0.3vw, 1rem); /* body */
+  --step-1: clamp(1rem, 1.05rem + 0.45vw, 1.25rem); /* h6 */
+  --step-2: clamp(1.15rem, 1.2rem + 0.6vw, 1.5rem); /* h5 */
+  --step-3: clamp(1.3rem, 1.35rem + 0.9vw, 1.85rem); /* h4 */
+  --step-4: clamp(1.5rem, 1.6rem + 1.1vw, 2.25rem); /* h3 */
+  --step-5: clamp(1.75rem, 1.9rem + 1.4vw, 2.75rem); /* h2 */
+  --step-6: clamp(2rem, 2.2rem + 1.8vw, 3.25rem); /* h1 */
+}
+
+.text-fluid-xs { font-size: var(--step--2); }
+.text-fluid-sm { font-size: var(--step--1); }
+.text-fluid-base { font-size: var(--step-0); }
+.text-fluid-md { font-size: var(--step-1); }
+.text-fluid-lg { font-size: var(--step-2); }
+.text-fluid-xl { font-size: var(--step-3); }
+.text-fluid-2xl { font-size: var(--step-4); }
+.text-fluid-3xl { font-size: var(--step-5); }
+.text-fluid-4xl { font-size: var(--step-6); }
+
+/* Utility for truncating subtitle on very narrow screens */
+@media (max-width: 360px) {
+  .subtitle-clamp {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
 }
 
 .logo {

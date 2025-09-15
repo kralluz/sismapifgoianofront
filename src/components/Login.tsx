@@ -76,12 +76,12 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
       <div className="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-md">
-        <div className="text-center mb-8">
-          <div className="flex items-center justify-center gap-2 mb-4">
-            <MapPin className="w-8 h-8 text-blue-600" />
-            <h1 className="text-2xl font-bold text-gray-900">SisMap IF</h1>
+        <div className="text-center mb-6 sm:mb-8">
+          <div className="flex items-center justify-center gap-2 mb-3 sm:mb-4">
+            <MapPin className="w-7 h-7 sm:w-8 sm:h-8 text-blue-600" />
+            <h1 className="font-bold text-gray-900 text-fluid-xl sm:text-fluid-2xl leading-tight">SisMap IF</h1>
           </div>
-          <p className="text-gray-600">
+          <p className="text-gray-600 text-fluid-sm sm:text-fluid-base max-w-xs mx-auto">
             {isRegisterMode
               ? "Criar nova conta"
               : "Faça login para acessar o mapa do campus"}
