@@ -90,14 +90,28 @@ const InteractiveMapSVG: React.FC<InteractiveMapSVGProps> = ({
         ref={mapRef}
         className={`w-full h-full select-none ${
           isEditMode
-            ? 'cursor-crosshair'
+            ? 'cursor-crosshair bg-blue-50'
             : mapInteraction.isDragging
             ? 'cursor-grabbing'
             : 'cursor-grab'
         }`}
         viewBox="0 0 100 100"
         preserveAspectRatio="xMidYMid meet"
-        onClick={onMapClick}
+        onClick={(e) => {
+          console.log('SVG clicked!', e.target, e.currentTarget);
+          // Only trigger if click is directly on SVG background or image
+          const target = e.target as Element;
+          const isBackground = target === e.currentTarget || target.tagName === 'image';
+          
+          if (isBackground && !mapInteraction.isDragging) {
+            console.log('Valid click on background, calling onMapClick');
+            e.preventDefault();
+            e.stopPropagation();
+            onMapClick(e);
+          } else {
+            console.log('Click ignored:', { isBackground, isDragging: mapInteraction.isDragging, target: target.tagName });
+          }
+        }}
         onMouseDown={mapInteraction.handleMouseDown}
         onMouseMove={mapInteraction.handleMouseMove}
         onMouseUp={mapInteraction.handleMouseUp}
@@ -264,13 +278,15 @@ const InteractiveMapSVG: React.FC<InteractiveMapSVGProps> = ({
         {rooms.map((room) => {
           const isSelected = selectedRoom?.id === room.id;
           const isEditing = editingRoom?.id === room.id;
+          const roomColor = getRoomColor(room, isSelected || isEditing);
+          
           return (
-            <g key={room.id} className={isEditMode ? 'cursor-pointer' : ''}>
+            <g key={`room-${room.id}`} className={isEditMode ? 'cursor-pointer' : ''}>
               <circle
                 cx={room.x}
                 cy={room.y}
                 r={isSelected || isEditing ? '3.5' : '2.5'}
-                fill={getRoomColor(room, isSelected || isEditing)}
+                fill={roomColor}
                 stroke="white"
                 strokeWidth="0.8"
                 className={`${

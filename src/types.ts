@@ -135,7 +135,7 @@ export interface RoomContextType {
   isLoading: boolean;
   error: string | null;
   fetchRooms: () => Promise<void>;
-  fetchRoom: (id: number) => Promise<void>;
+  fetchRoom: (id: number) => Promise<Room>;
   createRoom: (roomData: CreateRoomRequest) => Promise<Room>;
   updateRoom: (id: number, roomData: UpdateRoomRequest) => Promise<Room>;
   deleteRoom: (id: number) => Promise<void>;

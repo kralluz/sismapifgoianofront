@@ -1,4 +1,14 @@
-import type { LoginRequest, RegisterRequest, AuthResponse } from "../types";
+import type {
+  LoginRequest,
+  RegisterRequest,
+  AuthResponse,
+  Room,
+  CreateRoomRequest,
+  UpdateRoomRequest,
+  Project,
+  CreateProjectRequest,
+  UpdateProjectRequest,
+} from "../types";
 
 const API_BASE_URL = "http://localhost:3000";
 
@@ -60,42 +70,7 @@ export const authAPI = {
     return response.json();
   },
 
-  loginAlt: async (loginData: LoginRequest): Promise<AuthResponse> => {
-    const response = await fetch(`${API_BASE_URL}/login`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(loginData),
-    });
 
-    if (!response.ok) {
-      if (response.status === 401) {
-        throw new Error("Credenciais inválidas");
-      }
-      throw new Error("Erro ao fazer login");
-    }
-
-    return response.json();
-  },
-
-  registerAlt: async (userData: RegisterRequest): Promise<AuthResponse> => {
-    const response = await fetch(`${API_BASE_URL}/register`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(userData),
-    });
-
-    if (!response.ok) {
-      if (response.status === 400) {
-        throw new Error("Email já cadastrado ou dados inválidos");
-      }
-      if (response.status === 403) {
-        throw new Error("Apenas administradores podem criar contas");
-      }
-      throw new Error("Erro ao registrar usuário");
-    }
-
-    return response.json();
-  },
 };
 
 export const api = {
@@ -126,7 +101,7 @@ export const api = {
     return response.json();
   },
 
-  getRooms: async () => {
+  getRooms: async (): Promise<Room[]> => {
     const response = await fetch(`${API_BASE_URL}/api/room`, {
       headers: getAuthHeadersNoContentType(),
     });
@@ -134,7 +109,7 @@ export const api = {
     return response.json();
   },
 
-  getRoom: async (id: string) => {
+  getRoom: async (id: string): Promise<Room> => {
     const response = await fetch(`${API_BASE_URL}/api/room/${id}`, {
       headers: getAuthHeadersNoContentType(),
     });
@@ -142,17 +117,48 @@ export const api = {
     return response.json();
   },
 
-  createRoom: async (roomData: any) => {
-    const response = await fetch(`${API_BASE_URL}/api/room`, {
-      method: "POST",
-      headers: getAuthHeaders(),
-      body: JSON.stringify(roomData),
-    });
-    if (!response.ok) throw new Error("Erro ao criar sala");
-    return response.json();
+  createRoom: async (roomData: CreateRoomRequest): Promise<Room> => {
+    try {
+      console.log('Sending room data to API:', roomData);
+      const response = await fetch(`${API_BASE_URL}/api/room`, {
+        method: "POST",
+        headers: getAuthHeaders(),
+        body: JSON.stringify(roomData),
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.text();
+        console.error('API Error Response:', response.status, errorData);
+        
+        if (response.status === 401) {
+          throw new Error("Não autorizado. Faça login novamente.");
+        } else if (response.status === 400) {
+          try {
+            const jsonError = JSON.parse(errorData);
+            throw new Error(jsonError.error || "Dados inválidos");
+          } catch {
+            throw new Error("Dados inválidos fornecidos");
+          }
+        } else if (response.status === 500) {
+          throw new Error("Erro interno do servidor. Tente novamente.");
+        }
+        
+        throw new Error(`Erro ${response.status}: ${errorData || 'Erro ao criar sala'}`);
+      }
+      
+      const result = await response.json();
+      console.log('Room created successfully:', result);
+      return result;
+    } catch (error) {
+      console.error('Error in createRoom:', error);
+      if (error instanceof Error) {
+        throw error;
+      }
+      throw new Error("Erro ao criar sala");
+    }
   },
 
-  updateRoom: async (id: string, roomData: any) => {
+  updateRoom: async (id: string, roomData: UpdateRoomRequest): Promise<Room> => {
     const response = await fetch(`${API_BASE_URL}/api/room/${id}`, {
       method: "PUT",
       headers: getAuthHeaders(),
@@ -162,16 +168,22 @@ export const api = {
     return response.json();
   },
 
-  deleteRoom: async (id: string) => {
+  deleteRoom: async (id: string): Promise<void> => {
     const response = await fetch(`${API_BASE_URL}/api/room/${id}`, {
       method: "DELETE",
       headers: getAuthHeadersNoContentType(),
     });
     if (!response.ok) throw new Error("Erro ao deletar sala");
-    return response.json();
+    // 204 No Content
+    if (response.status === 204) return;
+    try {
+      return await response.json();
+    } catch {
+      return;
+    }
   },
 
-  getProjects: async () => {
+  getProjects: async (): Promise<Project[]> => {
     const response = await fetch(`${API_BASE_URL}/api/project`, {
       headers: getAuthHeadersNoContentType(),
     });
@@ -179,7 +191,7 @@ export const api = {
     return response.json();
   },
 
-  getProject: async (id: string) => {
+  getProject: async (id: string): Promise<Project> => {
     const response = await fetch(`${API_BASE_URL}/api/project/${id}`, {
       headers: getAuthHeadersNoContentType(),
     });
@@ -187,7 +199,7 @@ export const api = {
     return response.json();
   },
 
-  createProject: async (projectData: any) => {
+  createProject: async (projectData: CreateProjectRequest): Promise<Project> => {
     const response = await fetch(`${API_BASE_URL}/api/project`, {
       method: "POST",
       headers: getAuthHeaders(),
@@ -197,7 +209,7 @@ export const api = {
     return response.json();
   },
 
-  updateProject: async (id: string, projectData: any) => {
+  updateProject: async (id: string, projectData: UpdateProjectRequest): Promise<Project> => {
     const response = await fetch(`${API_BASE_URL}/api/project/${id}`, {
       method: "PUT",
       headers: getAuthHeaders(),
@@ -207,13 +219,18 @@ export const api = {
     return response.json();
   },
 
-  deleteProject: async (id: string) => {
+  deleteProject: async (id: string): Promise<void> => {
     const response = await fetch(`${API_BASE_URL}/api/project/${id}`, {
       method: "DELETE",
       headers: getAuthHeadersNoContentType(),
     });
     if (!response.ok) throw new Error("Erro ao deletar projeto");
-    return response.json();
+    if (response.status === 204) return;
+    try {
+      return await response.json();
+    } catch {
+      return;
+    }
   },
 
   healthCheck: async () => {

@@ -62,11 +62,36 @@ export const RoomProvider: React.FC<RoomProviderProps> = ({ children }) => {
     try {
       setIsLoading(true);
       setError(null);
+      
+      // Validate room data before sending
+      if (!roomData.name || roomData.name.trim().length < 2) {
+        throw new Error('Nome da sala deve ter pelo menos 2 caracteres');
+      }
+      
+      if (roomData.capacity < 1) {
+        throw new Error('Capacidade deve ser pelo menos 1');
+      }
+      
+      if (roomData.x < 0 || roomData.y < 0) {
+        throw new Error('Coordenadas devem ser positivas');
+      }
+      
+      console.log('Creating room with data:', roomData);
       const newRoom = await api.createRoom(roomData);
+      console.log('Room created successfully:', newRoom);
+      
       setRooms(prev => [...prev, newRoom]);
       return newRoom;
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Erro ao criar sala';
+      console.error('Error creating room:', err);
+      let errorMessage = 'Erro ao criar sala';
+      
+      if (err instanceof Error) {
+        errorMessage = err.message;
+      } else if (typeof err === 'string') {
+        errorMessage = err;
+      }
+      
       setError(errorMessage);
       throw new Error(errorMessage);
     } finally {

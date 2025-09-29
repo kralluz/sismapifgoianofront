@@ -10,6 +10,7 @@ import { useAuth } from "../provider/AuthContext";
 import CampusMapMVP from "../CampusMap";
 import UserList from "../components/UserList";
 import Layout from "../components/Layout";
+import SimpleMap from "../components/SimpleMap";
 
 const AppRoutes: React.FC = () => {
   const { user } = useAuth();
@@ -51,6 +52,9 @@ const AppRoutes: React.FC = () => {
             }
           />
         </Route>
+
+        {/* Rota para o mapa simples - SEM layout, apenas visualização */}
+        <Route path="/mapa-simples" element={<SimpleMap />} />
 
         {/* Rota padrão para URLs não encontradas */}
         <Route path="*" element={<Navigate to="/" replace />} />
