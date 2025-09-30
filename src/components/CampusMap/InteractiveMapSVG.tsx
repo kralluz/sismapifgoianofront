@@ -1,8 +1,7 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useState, useCallback } from 'react';
 import type { MouseEvent } from 'react';
 import type { Room, PathPoint } from '../../types';
 import { Route } from 'lucide-react';
-import type { UseMapInteractionReturn } from '../../hooks/useMapInteraction';
 
 interface InteractiveMapSVGProps {
   rooms: Room[];
@@ -15,7 +14,6 @@ interface InteractiveMapSVGProps {
   tempPathPoints: { x: number; y: number }[];
   userPathPoints: { x: number; y: number }[];
   editingRoom: Room | null;
-  mapInteraction: UseMapInteractionReturn;
   onMapClick: (e: MouseEvent<SVGSVGElement>) => void;
   onRoomClick: (room: Room) => void;
   onRemoveTempPoint: (index: number) => void;
@@ -42,7 +40,6 @@ const InteractiveMapSVG: React.FC<InteractiveMapSVGProps> = ({
   tempPathPoints,
   userPathPoints,
   editingRoom,
-  mapInteraction,
   onMapClick,
   onRoomClick,
   onRemoveTempPoint,
@@ -53,7 +50,37 @@ const InteractiveMapSVG: React.FC<InteractiveMapSVGProps> = ({
   onClearPath,
   onCancelPath,
 }) => {
+  // Estados para pan e zoom (do SimpleMap.tsx)
+  const [zoom, setZoom] = useState(1);
+  const [pan, setPan] = useState({ x: 0, y: 0 });
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+
   const mapRef = useRef<SVGSVGElement | null>(null);
+
+  // Handlers de mouse (do SimpleMap.tsx)
+  const handleMouseDown = useCallback((e: React.MouseEvent<SVGSVGElement>) => {
+    if (e.button === 0) { // Left click
+      setIsDragging(true);
+      setDragStart({ x: e.clientX - pan.x, y: e.clientY - pan.y });
+    }
+  }, [pan.x, pan.y]);
+
+  const handleMouseMove = useCallback((e: React.MouseEvent<SVGSVGElement>) => {
+    if (isDragging) {
+      // Aumentar sensibilidade do pan multiplicando por fator
+      const sensitivity = 2.5;
+      const newPan = {
+        x: (e.clientX - dragStart.x) * sensitivity,
+        y: (e.clientY - dragStart.y) * sensitivity,
+      };
+      setPan(newPan);
+    }
+  }, [isDragging, dragStart.x, dragStart.y]);
+
+  const handleMouseUp = useCallback(() => {
+    setIsDragging(false);
+  }, []);
 
   // Configurar event listener para zoom com scroll
   useEffect(() => {
@@ -61,7 +88,10 @@ const InteractiveMapSVG: React.FC<InteractiveMapSVGProps> = ({
     if (!mapElement) return;
 
     const handleWheel = (e: WheelEvent) => {
-      mapInteraction.handleWheel(e);
+      e.preventDefault();
+      const delta = e.deltaY > 0 ? 0.9 : 1.1;
+      const newZoom = Math.min(Math.max(zoom * delta, 0.5), 5);
+      setZoom(newZoom);
     };
 
     mapElement.addEventListener('wheel', handleWheel, { passive: false });
@@ -69,7 +99,7 @@ const InteractiveMapSVG: React.FC<InteractiveMapSVGProps> = ({
     return () => {
       mapElement.removeEventListener('wheel', handleWheel);
     };
-  }, [mapInteraction]);
+  }, [zoom]);
 
   const getRoomColor = (room: Room, isSelected: boolean) => {
     if (isSelected) return '#ef4444';
@@ -91,7 +121,7 @@ const InteractiveMapSVG: React.FC<InteractiveMapSVGProps> = ({
         className={`w-full h-full select-none ${
           isEditMode
             ? 'cursor-crosshair bg-blue-50'
-            : mapInteraction.isDragging
+            : isDragging
             ? 'cursor-grabbing'
             : 'cursor-grab'
         }`}
@@ -103,22 +133,22 @@ const InteractiveMapSVG: React.FC<InteractiveMapSVGProps> = ({
           const target = e.target as Element;
           const isBackground = target === e.currentTarget || target.tagName === 'image';
           
-          if (isBackground && !mapInteraction.isDragging) {
+          if (isBackground && !isDragging) {
             console.log('Valid click on background, calling onMapClick');
             e.preventDefault();
             e.stopPropagation();
             onMapClick(e);
           } else {
-            console.log('Click ignored:', { isBackground, isDragging: mapInteraction.isDragging, target: target.tagName });
+            console.log('Click ignored:', { isBackground, isDragging, target: target.tagName });
           }
         }}
-        onMouseDown={mapInteraction.handleMouseDown}
-        onMouseMove={mapInteraction.handleMouseMove}
-        onMouseUp={mapInteraction.handleMouseUp}
-        onMouseLeave={mapInteraction.handleMouseUp}
+        onMouseDown={handleMouseDown}
+        onMouseMove={handleMouseMove}
+        onMouseUp={handleMouseUp}
+        onMouseLeave={handleMouseUp}
         style={{
-          transform: `scale(${mapInteraction.zoom}) translate(${mapInteraction.pan.x / mapInteraction.zoom}px, ${
-            mapInteraction.pan.y / mapInteraction.zoom
+          transform: `scale(${zoom}) translate(${pan.x / zoom}px, ${
+            pan.y / zoom
           }px)`,
         }}
       >
@@ -129,7 +159,7 @@ const InteractiveMapSVG: React.FC<InteractiveMapSVGProps> = ({
           y="0"
           width="100"
           height="100"
-          preserveAspectRatio="xMidYMid meet"
+          preserveAspectRatio="xMidYMid slice"
         />
 
         {/* Caminho temporário durante criação */}
@@ -146,8 +176,8 @@ const InteractiveMapSVG: React.FC<InteractiveMapSVGProps> = ({
                   x2={nextPoint.x}
                   y2={nextPoint.y}
                   stroke="#f59e0b"
-                  strokeWidth="2"
-                  strokeDasharray="3,1"
+                  strokeWidth={2 / zoom}
+                  strokeDasharray={`${3 / zoom},${1 / zoom}`}
                   className="animate-pulse"
                 />
               );
@@ -158,10 +188,10 @@ const InteractiveMapSVG: React.FC<InteractiveMapSVGProps> = ({
                 <circle
                   cx={point.x}
                   cy={point.y}
-                  r="1.5"
+                  r={1.5 / zoom}
                   fill="#f59e0b"
                   stroke="white"
-                  strokeWidth="0.5"
+                  strokeWidth={0.5 / zoom}
                   className="animate-pulse cursor-pointer hover:fill-red-500"
                   onClick={(e) => {
                     e.stopPropagation();
@@ -171,7 +201,7 @@ const InteractiveMapSVG: React.FC<InteractiveMapSVGProps> = ({
                 <text
                   x={point.x}
                   y={point.y - 2.5}
-                  fontSize="2"
+                  fontSize={2 / zoom}
                   textAnchor="middle"
                   fill="white"
                   fontWeight="bold"
@@ -198,8 +228,8 @@ const InteractiveMapSVG: React.FC<InteractiveMapSVGProps> = ({
                   x2={nextPoint.x}
                   y2={nextPoint.y}
                   stroke="#10b981"
-                  strokeWidth="2"
-                  strokeDasharray="5,2"
+                  strokeWidth={2 / zoom}
+                  strokeDasharray={`${5 / zoom},${2 / zoom}`}
                   className="animate-pulse"
                 />
               );
@@ -210,10 +240,10 @@ const InteractiveMapSVG: React.FC<InteractiveMapSVGProps> = ({
                 <circle
                   cx={point.x}
                   cy={point.y}
-                  r="1.5"
+                  r={1.5 / zoom}
                   fill="#10b981"
                   stroke="white"
-                  strokeWidth="0.5"
+                  strokeWidth={0.5 / zoom}
                   className="cursor-pointer hover:fill-red-500"
                   onClick={(e) => {
                     if (isPlacingUserPath) {
@@ -225,7 +255,7 @@ const InteractiveMapSVG: React.FC<InteractiveMapSVGProps> = ({
                 <text
                   x={point.x}
                   y={point.y - 2.5}
-                  fontSize="2"
+                  fontSize={2 / zoom}
                   textAnchor="middle"
                   fill="white"
                   fontWeight="bold"
@@ -252,8 +282,8 @@ const InteractiveMapSVG: React.FC<InteractiveMapSVGProps> = ({
                   x2={nextPoint.x}
                   y2={nextPoint.y}
                   stroke="#f59e0b"
-                  strokeWidth="1.2"
-                  strokeDasharray="3,2"
+                  strokeWidth={1.2 / zoom}
+                  strokeDasharray={`${3 / zoom},${2 / zoom}`}
                   className="animate-pulse"
                 />
               );
@@ -264,10 +294,10 @@ const InteractiveMapSVG: React.FC<InteractiveMapSVGProps> = ({
                 key={`active-point-${index}`}
                 cx={point.x}
                 cy={point.y}
-                r="1.2"
+                r={1.2 / zoom}
                 fill="#fbbf24"
                 stroke="#f59e0b"
-                strokeWidth="0.3"
+                strokeWidth={0.3 / zoom}
                 className="animate-pulse"
               />
             ))}
@@ -285,10 +315,10 @@ const InteractiveMapSVG: React.FC<InteractiveMapSVGProps> = ({
               <circle
                 cx={room.x}
                 cy={room.y}
-                r={isSelected || isEditing ? '3.5' : '2.5'}
+                r={(isSelected || isEditing ? 3.5 : 2.5) / zoom}
                 fill={roomColor}
                 stroke="white"
-                strokeWidth="0.8"
+                strokeWidth={0.8 / zoom}
                 className={`${
                   isEditMode
                     ? 'cursor-pointer hover:scale-125'
@@ -303,13 +333,13 @@ const InteractiveMapSVG: React.FC<InteractiveMapSVGProps> = ({
                     isSelected || isEditing
                       ? 'drop-shadow(0 0 5px rgba(239, 68, 68, 0.8))'
                       : 'none',
-                  strokeDasharray: isEditing ? '2,1' : 'none',
+                  strokeDasharray: isEditing ? `${2 / zoom},${1 / zoom}` : 'none',
                 }}
               />
               <text
                 x={room.x}
                 y={room.y - 4.5}
-                fontSize="1.8"
+                fontSize={1.8 / zoom}
                 textAnchor="middle"
                 fill="#1f2937"
                 className="font-semibold pointer-events-none select-none"
@@ -322,7 +352,7 @@ const InteractiveMapSVG: React.FC<InteractiveMapSVGProps> = ({
               <text
                 x={room.x}
                 y={room.y + 0.5}
-                fontSize="1.2"
+                fontSize={1.2 / zoom}
                 textAnchor="middle"
                 fill="white"
                 className="pointer-events-none select-none"
@@ -333,10 +363,10 @@ const InteractiveMapSVG: React.FC<InteractiveMapSVGProps> = ({
                 <circle
                   cx={room.x + 3}
                   cy={room.y - 3}
-                  r="1.5"
+                  r={1.5 / zoom}
                   fill="#f59e0b"
                   stroke="white"
-                  strokeWidth="0.3"
+                  strokeWidth={0.3 / zoom}
                   className="cursor-pointer hover:fill-orange-500"
                   onClick={(e) => {
                     e.stopPropagation();
@@ -442,7 +472,7 @@ const InteractiveMapSVG: React.FC<InteractiveMapSVGProps> = ({
       <div className="absolute bottom-4 left-4 bg-white/95 backdrop-blur-sm rounded-lg px-3 py-2 text-sm text-gray-700 shadow-lg border border-gray-200">
         <div className="flex items-center gap-2">
           <span className="font-medium">Zoom:</span>
-          <span className="text-blue-600 font-semibold">{(mapInteraction.zoom * 100).toFixed(0)}%</span>
+          <span className="text-blue-600 font-semibold">{(zoom * 100).toFixed(0)}%</span>
         </div>
       </div>
     </div>

@@ -7,8 +7,6 @@ import {
   Trash2,
   Route,
   Plus,
-  Minus,
-  RotateCcw,
   Loader2,
   MapPin,
 } from "lucide-react";
@@ -30,7 +28,7 @@ import RoomPopover from "./components/CampusMap/RoomPopover";
 import RoomList from "./components/CampusMap/RoomList";
 
 // Hooks
-import { useMapInteraction } from "./hooks/useMapInteraction";
+// import { useMapInteraction } from "./hooks/useMapInteraction";
 
 const CampusMapMVP: React.FC = () => {
   // Modal de criação de sala
@@ -105,7 +103,7 @@ const CampusMapMVP: React.FC = () => {
   }, [successMessage]);
 
   // Hook para interação do mapa
-  const mapInteraction = useMapInteraction(isEditMode);
+  // const mapInteraction = useMapInteraction(isEditMode);
 
   // Load rooms from API on component mount - ONE TIME ONLY
   useEffect(() => {
@@ -170,11 +168,11 @@ const CampusMapMVP: React.FC = () => {
   const handleMapClick = (e: MouseEvent<SVGSVGElement>) => {
     console.log('Map clicked!', { isEditMode, isCreatingPath, isPlacingUserPath });
     
-    // Prevent action if dragging
-    if (mapInteraction.isDragging) {
-      console.log('Ignoring click because dragging');
-      return;
-    }
+    // Prevent action if dragging - handled internally by InteractiveMapSVG now
+    // if (mapInteraction.isDragging) {
+    //   console.log('Ignoring click because dragging');
+    //   return;
+    // }
     
     // Get basic coordinates first
     const rect = e.currentTarget.getBoundingClientRect();
@@ -649,7 +647,6 @@ const CampusMapMVP: React.FC = () => {
             tempPathPoints={tempPathPoints}
             userPathPoints={userPathPoints}
             editingRoom={editingRoom}
-            mapInteraction={mapInteraction}
             onMapClick={handleMapClick}
             onRoomClick={handleRoomClick}
             onRemoveTempPoint={handleRemoveTempPoint}
@@ -707,30 +704,7 @@ const CampusMapMVP: React.FC = () => {
         /* Em telas pequenas colocamos acima do painel h-64 (16rem) */
         style={{ bottom: 'clamp(1.5rem, 16rem + 1.5rem, 18rem)' }}
       >
-        <button
-          onClick={mapInteraction.handleZoomIn}
-          aria-label="Aumentar zoom"
-          className="bg-white rounded-lg p-3 shadow-xl hover:bg-gray-50 transition-all duration-200 border border-gray-200 group hover:shadow-2xl focus:outline-none focus:ring-2 focus:ring-blue-500"
-          title="Aumentar zoom"
-        >
-          <Plus className="w-5 h-5 text-gray-600 group-hover:text-blue-600" />
-        </button>
-        <button
-          onClick={mapInteraction.handleZoomOut}
-          aria-label="Diminuir zoom"
-          className="bg-white rounded-lg p-3 shadow-xl hover:bg-gray-50 transition-all duration-200 border border-gray-200 group hover:shadow-2xl focus:outline-none focus:ring-2 focus:ring-blue-500"
-          title="Diminuir zoom"
-        >
-          <Minus className="w-5 h-5 text-gray-600 group-hover:text-blue-600" />
-        </button>
-        <button
-          onClick={mapInteraction.resetView}
-          aria-label="Centralizar mapa"
-          className="bg-white rounded-lg p-3 shadow-xl hover:bg-gray-50 transition-all duration-200 border border-gray-200 group hover:shadow-2xl focus:outline-none focus:ring-2 focus:ring-blue-500"
-          title="Centralizar mapa"
-        >
-          <RotateCcw className="w-5 h-5 text-gray-600 group-hover:text-blue-600" />
-        </button>
+        {/* Controles de zoom removidos - agora controlados pelo InteractiveMapSVG */}
         {/* Acessibilidade por teclado: atalhos indicados futuramente em tooltip */}
       </div>
 
