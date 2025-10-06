@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../services/api';
 import type { Room, CreateRoomRequest } from '../types';
-import { Plus, X, Loader2, MapPin, Info, Users, Building, Hash } from 'lucide-react';
+import { Plus, X, Loader2, MapPin, Info, Users, Building, Hash, Search } from 'lucide-react';
 
 const SimpleMap: React.FC = () => {
   // Estados
@@ -26,6 +26,9 @@ const SimpleMap: React.FC = () => {
   const [isCreating, setIsCreating] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [showSidebar, setShowSidebar] = useState(true);
+  const [showMobileSheet, setShowMobileSheet] = useState(false);
 
   // Dados do novo ponto/sala
   const [newRoomData, setNewRoomData] = useState({
@@ -293,12 +296,9 @@ const SimpleMap: React.FC = () => {
 
   const handleMouseMove = (e: React.MouseEvent<SVGSVGElement>) => {
     if (!isDragging) return;
-    
-    // Aumentar sensibilidade do pan multiplicando por fator
-    const sensitivity = 2.5;
     setPan({
-      x: (e.clientX - dragStart.x) * sensitivity,
-      y: (e.clientY - dragStart.y) * sensitivity
+      x: e.clientX - dragStart.x,
+      y: e.clientY - dragStart.y
     });
   };
 
@@ -307,7 +307,9 @@ const SimpleMap: React.FC = () => {
   };
 
   const handleWheel = (e: React.WheelEvent<SVGSVGElement>) => {
+    if (!e.shiftKey) return;
     e.preventDefault();
+    e.stopPropagation();
     const delta = e.deltaY > 0 ? 0.9 : 1.1;
     setZoom(prev => Math.max(0.5, Math.min(5, prev * delta)));
   };
@@ -325,9 +327,15 @@ const SimpleMap: React.FC = () => {
     setPan({ x: 0, y: 0 });
   };
 
+  const filteredRooms = rooms.filter(room => 
+    room.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    room.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    room.building.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    room.type.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
   return (
-    <div className="h-screen w-full bg-gray-100 flex flex-col">
-      {/* Mensagens */}
+    <div className="h-screen w-full bg-gray-100 flex flex-col md:flex-row">
       {successMessage && (
         <div className="fixed top-20 right-4 bg-green-500 text-white px-4 py-3 rounded-lg shadow-lg z-50 flex items-center gap-2">
           <span className="text-sm font-medium">{successMessage}</span>
@@ -346,80 +354,241 @@ const SimpleMap: React.FC = () => {
         </div>
       )}
 
-      {/* Header com instruções */}
-      <div className="bg-white border-b border-gray-200 p-4 shadow-sm">
-        <div className="max-w-4xl mx-auto">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-xl font-bold text-gray-800 mb-2 flex items-center gap-2">
-                <MapPin className="w-6 h-6 text-blue-600" />
-                Mapa Interativo Simples
-              </h1>
-              <p className="text-sm text-gray-600">
-                {isTracingPath 
-                  ? "Clique no mapa para adicionar pontos ao caminho. Use os botões para gerenciar o traçado."
-                  : waitingForClick 
-                    ? (editMode === 'create' ? "Clique no mapa para definir a posição do novo ponto" : "Clique no mapa para definir a nova posição")
-                    : "Use o menu lateral para gerenciar pontos ou clique nos pontos para ver detalhes"
-                }
-              </p>
-              <div className="mt-1 flex items-center gap-6 text-xs text-gray-500">
-                <div className="flex items-center gap-1">
-                  <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
-                  <span>Pontos/Salas</span>
+      {/* Barra de Pesquisa Mobile - Topo */}
+      <div className="md:hidden bg-white border-b border-gray-200 p-3">
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+          <input
+            type="text"
+            placeholder="Pesquisar locais..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full pl-10 pr-10 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+          />
+          {searchTerm && (
+            <button onClick={() => setSearchTerm('')} className="absolute right-3 top-1/2 transform -translate-y-1/2">
+              <X className="w-4 h-4 text-gray-400" />
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Barra Lateral Desktop */}
+      {showSidebar && (
+        <div className="hidden md:flex w-96 bg-white border-r border-gray-200 flex-col h-full">
+          <div className="p-4 border-b border-gray-200 bg-gradient-to-r from-blue-600 to-blue-700">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center">
+                  <MapPin className="w-6 h-6 text-blue-600" />
                 </div>
-                <div className="flex items-center gap-1">
-                  <div className="w-8 h-0.5 bg-green-500 opacity-70" style={{background: 'repeating-linear-gradient(to right, #10B981 0, #10B981 4px, transparent 4px, transparent 8px)'}}></div>
-                  <span>Caminhos</span>
-                </div>
-                <div className="flex items-center gap-1">
-                  <div className="w-2 h-2 bg-green-500 rounded-full opacity-60"></div>
-                  <span>Pontos intermediários</span>
+                <div>
+                  <h2 className="text-lg font-bold text-white">SisMap</h2>
+                  <p className="text-xs text-blue-100">IF Goiano</p>
                 </div>
               </div>
-              <div className="mt-2 flex items-center gap-4 text-xs text-gray-500">
-                <span>Total de pontos: {rooms.length}</span>
-                <span>Com caminhos: {rooms.filter(room => room.path && room.path.length > 1).length}</span>
-                {loading && <span className="text-blue-600">Carregando...</span>}
-              </div>
-            </div>
-            
-            {/* Botões de ação */}
-            <div className="flex gap-3">
-              {waitingForClick && (
-                <button
-                  onClick={cancelEditMode}
-                  className="px-4 py-2 rounded-lg transition-colors flex items-center gap-2 text-sm font-medium bg-red-100 text-red-700 hover:bg-red-200"
-                >
-                  <X className="w-4 h-4" />
-                  Cancelar
-                </button>
-              )}
-              
               <button
-                onClick={() => setShowEditMenu(!showEditMenu)}
-                className={`px-4 py-2 rounded-lg transition-colors flex items-center gap-2 text-sm font-medium ${
-                  showEditMenu 
-                    ? 'bg-blue-600 text-white hover:bg-blue-700' 
-                    : 'bg-blue-100 text-blue-700 hover:bg-blue-200'
-                }`}
+                onClick={() => setShowSidebar(false)}
+                className="text-blue-100 hover:text-white transition-colors"
               >
-                {showEditMenu ? (
-                  <>
-                    <X className="w-4 h-4" />
-                    Fechar Menu
-                  </>
-                ) : (
-                  <>
-                    <Plus className="w-4 h-4" />
-                    Menu de Edição
-                  </>
-                )}
+                <X className="w-5 h-5" />
               </button>
             </div>
           </div>
+
+          <div className="p-4 border-b border-gray-200">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <input
+                type="text"
+                placeholder="Pesquisar locais..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-10 pr-10 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+              />
+              {searchTerm && (
+                <button onClick={() => setSearchTerm('')} className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                  <X className="w-4 h-4 text-gray-400" />
+                </button>
+              )}
+            </div>
+          </div>
+
+          <div className="px-4 py-3 bg-gray-50 border-b border-gray-200">
+            <div className="flex items-center justify-between text-xs text-gray-600">
+              <span>{filteredRooms.length} de {rooms.length} locais</span>
+              <span>{rooms.filter(room => room.path && room.path.length > 1).length} com rotas</span>
+            </div>
+          </div>
+
+          <div className="px-4 py-3 border-b border-gray-200">
+            <button
+              onClick={() => setShowEditMenu(!showEditMenu)}
+              className={`w-full px-4 py-2.5 rounded-lg transition-colors flex items-center justify-center gap-2 font-medium text-sm ${
+                showEditMenu ? 'bg-red-100 text-red-700 hover:bg-red-200' : 'bg-blue-600 text-white hover:bg-blue-700'
+              }`}
+            >
+              {showEditMenu ? (
+                <>
+                  <X className="w-4 h-4" />
+                  Cancelar Edição
+                </>
+              ) : (
+                <>
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                  </svg>
+                  Modo Edição
+                </>
+              )}
+            </button>
+          </div>
+
+          {showEditMenu && (
+            <div className="px-4 py-3 border-b border-gray-200">
+              {!waitingForClick && (
+                <button
+                  onClick={startCreateMode}
+                  className="w-full bg-green-600 text-white px-4 py-2.5 rounded-lg hover:bg-green-700 transition-colors flex items-center justify-center gap-2 font-medium text-sm"
+                >
+                  <Plus className="w-4 h-4" />
+                  Criar Novo Local
+                </button>
+              )}
+            </div>
+          )}
+
+          <div className="flex-1 overflow-y-auto p-4">
+            <div className="space-y-2">
+              {loading ? (
+                <div className="text-center py-8">
+                  <Loader2 className="w-6 h-6 animate-spin mx-auto text-gray-400" />
+                  <p className="text-sm text-gray-500 mt-2">Carregando...</p>
+                </div>
+              ) : filteredRooms.length === 0 ? (
+                <div className="text-center py-8">
+                  <MapPin className="w-12 h-12 mx-auto text-gray-300 mb-3" />
+                  <p className="text-sm text-gray-500">
+                    {searchTerm ? 'Nenhum local encontrado' : 'Nenhum local cadastrado'}
+                  </p>
+                </div>
+              ) : (
+                filteredRooms.map((room) => (
+                  <div
+                    key={room.id}
+                    className={`p-3 rounded-lg border cursor-pointer transition-all hover:shadow-md ${
+                      selectedRoom?.id === room.id ? 'bg-blue-50 border-blue-200' : 'bg-white border-gray-200'
+                    }`}
+                    onClick={() => { setSelectedRoom(room); setShowRoomDetails(true); }}
+                  >
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-medium text-gray-800 truncate">{room.name}</h3>
+                        <p className="text-sm text-gray-600 mt-1 line-clamp-2">{room.description}</p>
+                        <div className="flex items-center gap-4 mt-2 text-xs text-gray-500">
+                          <span className="flex items-center gap-1"><Users className="w-3 h-3" />{room.capacity}</span>
+                          <span className="flex items-center gap-1"><Building className="w-3 h-3" />{room.building}</span>
+                          <span className="flex items-center gap-1"><Hash className="w-3 h-3" />{room.floor}° andar</span>
+                        </div>
+                      </div>
+                      {room.path && room.path.length > 1 && (
+                        <div className="ml-2"><div className="w-2 h-2 bg-green-500 rounded-full"></div></div>
+                      )}
+                    </div>
+                    {showEditMenu && !waitingForClick && (
+                      <div className="flex gap-2 mt-3 pt-3 border-t border-gray-200" onClick={(e) => e.stopPropagation()}>
+                        <button onClick={() => startEditMode(room)} className="flex-1 bg-blue-100 text-blue-700 px-3 py-1.5 rounded text-xs font-medium hover:bg-blue-200">Editar</button>
+                        <button onClick={() => handleDeleteRoom(room)} disabled={isDeleting} className="flex-1 bg-red-100 text-red-700 px-3 py-1.5 rounded text-xs font-medium hover:bg-red-200 disabled:opacity-50">
+                          {isDeleting ? <Loader2 className="w-3 h-3 animate-spin mx-auto" /> : 'Excluir'}
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
         </div>
-      </div>
+      )}
+
+      {!showSidebar && (
+        <button onClick={() => setShowSidebar(true)} className="hidden md:block absolute left-4 top-4 z-10 bg-white border border-gray-300 rounded-lg p-2 shadow-md hover:bg-gray-50">
+          <MapPin className="w-5 h-5 text-gray-700" />
+        </button>
+      )}
+
+      {/* Botão Mobile - Parte Inferior */}
+      <button
+        onClick={() => setShowMobileSheet(true)}
+        className="md:hidden fixed bottom-4 left-1/2 transform -translate-x-1/2 z-20 bg-blue-600 text-white px-6 py-3 rounded-full shadow-lg flex items-center gap-2 font-medium"
+      >
+        <MapPin className="w-5 h-5" />
+        Ver Locais ({filteredRooms.length})
+      </button>
+
+      {/* Sheet Mobile - Lista de Locais */}
+      {showMobileSheet && (
+        <div className="md:hidden fixed inset-0 z-50 bg-black/50" onClick={() => setShowMobileSheet(false)}>
+          <div 
+            className="absolute bottom-0 left-0 right-0 bg-white rounded-t-2xl max-h-[80vh] flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="p-4 border-b border-gray-200">
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="text-lg font-bold text-gray-800">Locais</h2>
+                <button onClick={() => setShowMobileSheet(false)}>
+                  <X className="w-6 h-6 text-gray-600" />
+                </button>
+              </div>
+              <p className="text-sm text-gray-600">{filteredRooms.length} de {rooms.length} locais</p>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-4">
+              <div className="space-y-2">
+                {loading ? (
+                  <div className="text-center py-8">
+                    <Loader2 className="w-6 h-6 animate-spin mx-auto text-gray-400" />
+                    <p className="text-sm text-gray-500 mt-2">Carregando...</p>
+                  </div>
+                ) : filteredRooms.length === 0 ? (
+                  <div className="text-center py-8">
+                    <MapPin className="w-12 h-12 mx-auto text-gray-300 mb-3" />
+                    <p className="text-sm text-gray-500">Nenhum local encontrado</p>
+                  </div>
+                ) : (
+                  filteredRooms.map((room) => (
+                    <div
+                      key={room.id}
+                      className="p-3 rounded-lg border bg-white border-gray-200 active:bg-gray-50"
+                      onClick={() => { 
+                        setSelectedRoom(room); 
+                        setShowRoomDetails(true);
+                        setShowMobileSheet(false);
+                      }}
+                    >
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1 min-w-0">
+                          <h3 className="font-medium text-gray-800 truncate">{room.name}</h3>
+                          <p className="text-sm text-gray-600 mt-1 line-clamp-2">{room.description}</p>
+                          <div className="flex items-center gap-3 mt-2 text-xs text-gray-500">
+                            <span className="flex items-center gap-1"><Users className="w-3 h-3" />{room.capacity}</span>
+                            <span className="flex items-center gap-1"><Hash className="w-3 h-3" />{room.floor}° andar</span>
+                          </div>
+                        </div>
+                        {room.path && room.path.length > 1 && (
+                          <div className="ml-2"><div className="w-2 h-2 bg-green-500 rounded-full"></div></div>
+                        )}
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="flex-1 flex flex-col">
 
       {/* Seção de Criação/Edição de Sala */}
       {editMode === 'create' && (
@@ -820,128 +989,10 @@ const SimpleMap: React.FC = () => {
         </div>
       )}
 
-      {/* Container do Mapa com Menu Lateral */}
       <div className="flex-1 flex">
-        {/* Menu Lateral de Edição */}
-        {showEditMenu && (
-          <div className="w-80 bg-white border-r border-gray-200 p-4 overflow-y-auto">
-            <div className="space-y-4">
-              {/* Cabeçalho do Menu */}
-              <div className="border-b border-gray-200 pb-3">
-                <h2 className="text-lg font-semibold text-gray-800 mb-2">Gerenciar Pontos</h2>
-                <p className="text-sm text-gray-600">
-                  {waitingForClick 
-                    ? (editMode === 'create' ? "Clique no mapa para posicionar" : "Clique no mapa para reposicionar")
-                    : `${rooms.length} pontos cadastrados`
-                  }
-                </p>
-              </div>
-
-              {/* Botão Criar Novo */}
-              {!waitingForClick && (
-                <button
-                  onClick={startCreateMode}
-                  className="w-full bg-green-600 text-white px-4 py-3 rounded-lg hover:bg-green-700 transition-colors flex items-center justify-center gap-2 font-medium"
-                >
-                  <Plus className="w-5 h-5" />
-                  Criar Novo Ponto
-                </button>
-              )}
-
-              {/* Lista de Salas */}
-              <div className="space-y-3">
-                {loading ? (
-                  <div className="text-center py-8">
-                    <Loader2 className="w-6 h-6 animate-spin mx-auto text-gray-400" />
-                    <p className="text-sm text-gray-500 mt-2">Carregando pontos...</p>
-                  </div>
-                ) : rooms.length === 0 ? (
-                  <div className="text-center py-8">
-                    <MapPin className="w-12 h-12 mx-auto text-gray-300 mb-3" />
-                    <p className="text-sm text-gray-500">Nenhum ponto cadastrado</p>
-                    <p className="text-xs text-gray-400 mt-1">Clique em "Criar Novo Ponto" para começar</p>
-                  </div>
-                ) : (
-                  rooms.map((room) => (
-                    <div
-                      key={room.id}
-                      className="bg-gray-50 border border-gray-200 rounded-lg p-3 hover:bg-gray-100 transition-colors"
-                    >
-                      {/* Cabeçalho do Card */}
-                      <div className="flex items-start justify-between mb-2">
-                        <div className="flex-1 min-w-0">
-                          <h3 className="font-medium text-gray-800 truncate">{room.name}</h3>
-                          <p className="text-xs text-gray-500 mt-1">
-                            {room.type} • {room.capacity} pessoas • Andar {room.floor}
-                          </p>
-                          <p className="text-xs text-gray-400">
-                            Posição: ({room.x.toFixed(1)}, {room.y.toFixed(1)})
-                          </p>
-                        </div>
-                        
-                        {/* Indicador de Caminho */}
-                        {room.path && room.path.length > 1 && (
-                          <div className="text-green-600 ml-2">
-                            <div className="w-2 h-2 bg-green-500 rounded-full" title="Tem caminho definido"></div>
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Descrição */}
-                      {room.description && (
-                        <p className="text-xs text-gray-600 mb-3 line-clamp-2">
-                          {room.description}
-                        </p>
-                      )}
-
-                      {/* Botões de Ação */}
-                      {!waitingForClick ? (
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() => startEditMode(room)}
-                            className="flex-1 bg-blue-100 text-blue-700 px-3 py-2 rounded text-xs font-medium hover:bg-blue-200 transition-colors flex items-center justify-center gap-1"
-                          >
-                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                            </svg>
-                            Editar
-                          </button>
-                          
-                          <button
-                            onClick={() => handleDeleteRoom(room)}
-                            disabled={isDeleting}
-                            className="flex-1 bg-red-100 text-red-700 px-3 py-2 rounded text-xs font-medium hover:bg-red-200 transition-colors flex items-center justify-center gap-1 disabled:opacity-50"
-                          >
-                            {isDeleting ? (
-                              <Loader2 className="w-3 h-3 animate-spin" />
-                            ) : (
-                              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                              </svg>
-                            )}
-                            Excluir
-                          </button>
-                        </div>
-                      ) : (
-                        <div className="text-center py-2">
-                          <p className="text-xs text-gray-500">
-                            {editMode === 'edit' && roomToEdit?.id === room.id 
-                              ? "Clique no mapa para reposicionar" 
-                              : "Aguardando ação..."
-                            }
-                          </p>
-                        </div>
-                      )}
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
-          </div>
-        )}
 
         {/* Container do Mapa */}
-        <div className="flex-1 p-4 relative">
+        <div className="flex-1 relative overflow-hidden">
           {/* Controles de Zoom */}
           <div className="absolute top-6 right-6 z-10 flex flex-col gap-2">
             <button
@@ -974,7 +1025,7 @@ const SimpleMap: React.FC = () => {
             </div>
           </div>
           
-          <div className="w-full h-full max-w-6xl max-h-4xl mx-auto">
+          <div className="w-full h-full">
           <svg
             className={`w-full h-full border border-gray-300 rounded-lg shadow-lg bg-white ${
               isDragging ? 'cursor-grabbing' : 
@@ -988,6 +1039,7 @@ const SimpleMap: React.FC = () => {
             onMouseUp={handleMouseUp}
             onMouseLeave={handleMouseUp}
             onWheel={handleWheel}
+            style={{ touchAction: 'none' }}
           >
             {/* Grupo principal com transformações de zoom e pan */}
             <g transform={`scale(${zoom}) translate(${pan.x / zoom}, ${pan.y / zoom})`}>
@@ -1230,6 +1282,7 @@ const SimpleMap: React.FC = () => {
           </div>
         </div>
       )}
+      </div>
       </div>
     </div>
   );
