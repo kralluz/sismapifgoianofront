@@ -29,6 +29,7 @@ const SimpleMap: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [showSidebar, setShowSidebar] = useState(true);
   const [showMobileSheet, setShowMobileSheet] = useState(false);
+  const [highlightedRoomId, setHighlightedRoomId] = useState<number | null>(null);
 
   // Dados do novo ponto/sala
   const [newRoomData, setNewRoomData] = useState({
@@ -476,10 +477,9 @@ const SimpleMap: React.FC = () => {
                 filteredRooms.map((room) => (
                   <div
                     key={room.id}
-                    className={`p-3 rounded-lg border cursor-pointer transition-all hover:shadow-md ${
+                    className={`p-3 rounded-lg border transition-all hover:shadow-md ${
                       selectedRoom?.id === room.id ? 'bg-blue-50 border-blue-200' : 'bg-white border-gray-200'
                     }`}
-                    onClick={() => { setSelectedRoom(room); setShowRoomDetails(true); }}
                   >
                     <div className="flex items-start justify-between">
                       <div className="flex-1 min-w-0">
@@ -495,8 +495,24 @@ const SimpleMap: React.FC = () => {
                         <div className="ml-2"><div className="w-2 h-2 bg-green-500 rounded-full"></div></div>
                       )}
                     </div>
+                    <div className="flex gap-2 mt-3 pt-3 border-t border-gray-200">
+                      {room.path && room.path.length > 1 && (
+                        <button 
+                          onClick={() => setHighlightedRoomId(highlightedRoomId === room.id ? null : room.id)}
+                          className="flex-1 bg-green-100 text-green-700 px-3 py-1.5 rounded text-xs font-medium hover:bg-green-200"
+                        >
+                          {highlightedRoomId === room.id ? 'Ocultar Rota' : 'Mostrar Rota'}
+                        </button>
+                      )}
+                      <button 
+                        onClick={() => { setSelectedRoom(room); setShowRoomDetails(true); }}
+                        className="flex-1 bg-blue-100 text-blue-700 px-3 py-1.5 rounded text-xs font-medium hover:bg-blue-200"
+                      >
+                        Ver Detalhes
+                      </button>
+                    </div>
                     {showEditMenu && !waitingForClick && (
-                      <div className="flex gap-2 mt-3 pt-3 border-t border-gray-200" onClick={(e) => e.stopPropagation()}>
+                      <div className="flex gap-2 mt-2">
                         <button onClick={() => startEditMode(room)} className="flex-1 bg-blue-100 text-blue-700 px-3 py-1.5 rounded text-xs font-medium hover:bg-blue-200">Editar</button>
                         <button onClick={() => handleDeleteRoom(room)} disabled={isDeleting} className="flex-1 bg-red-100 text-red-700 px-3 py-1.5 rounded text-xs font-medium hover:bg-red-200 disabled:opacity-50">
                           {isDeleting ? <Loader2 className="w-3 h-3 animate-spin mx-auto" /> : 'Excluir'}
@@ -564,6 +580,7 @@ const SimpleMap: React.FC = () => {
                         setSelectedRoom(room); 
                         setShowRoomDetails(true);
                         setShowMobileSheet(false);
+                        setHighlightedRoomId(room.id);
                       }}
                     >
                       <div className="flex items-start justify-between">
@@ -1045,19 +1062,24 @@ const SimpleMap: React.FC = () => {
             <g transform={`scale(${zoom}) translate(${pan.x / zoom}, ${pan.y / zoom})`}>
             {/* Imagem do mapa como fundo */}
             <image
-              href="/mapa/mapa.png"
+              href="/mapa/mapa.jpeg"
               x="0"
               y="0"
               width="100"
               height="100"
               preserveAspectRatio="xMidYMid slice"
+              transform="rotate(90 50 50)"
             />
 
             {/* Renderizar caminhos e pontos existentes */}
-            {rooms.map((room) => (
+            {rooms.map((room) => {
+              const isHighlighted = highlightedRoomId === room.id;
+              const shouldShow = !highlightedRoomId || isHighlighted;
+              
+              return (
               <g key={room.id}>
                 {/* Renderizar caminho se existir */}
-                {room.path && room.path.length > 1 && (
+                {shouldShow && room.path && room.path.length > 1 && (
                   <g>
                     {/* Linha do caminho */}
                     <polyline
@@ -1090,33 +1112,35 @@ const SimpleMap: React.FC = () => {
                   </g>
                 )}
                 {/* Círculo do ponto de destino */}
-                <circle
+                {shouldShow && <circle
                   cx={room.x}
                   cy={room.y}
-                  r={1.8 / zoom}
+                  r={0.6 / zoom}
                   fill="#3B82F6"
                   stroke="#1E40AF"
-                  strokeWidth={0.3 / zoom}
+                  strokeWidth={0.15 / zoom}
                   className="hover:fill-blue-700 transition-colors cursor-pointer"
                   onClick={(e) => handleRoomClick(room, e)}
-                />
+                />}
                 {/* Label do ponto */}
-                <text
+                {shouldShow && <text
                   x={room.x}
-                  y={room.y - 3.5}
+                  y={room.y - 1.0}
                   textAnchor="middle"
-                  className="fill-gray-700 text-xs font-medium pointer-events-none"
-                  fontSize={2.2 / zoom}
+                  className="fill-gray-700 pointer-events-none"
+                  fontSize={1.5 / zoom}
+                  fontWeight="500"
                 >
                   {room.name}
-                </text>
+                </text>}
                 {/* Informações adicionais em hover */}
                 <title>
                   {room.name} - {room.description}
                   {room.path && ` (Caminho com ${room.path.length} pontos)`}
                 </title>
               </g>
-            ))}
+            );
+            })}
             {/* Renderizar caminho sendo traçado manualmente */}
             {isTracingPath && tracedPath.length > 0 && (
               <g>
@@ -1272,7 +1296,10 @@ const SimpleMap: React.FC = () => {
               {/* Botão de fechar */}
               <div className="mt-6 pt-4 border-t border-gray-200">
                 <button 
-                  onClick={() => setShowRoomDetails(false)}
+                  onClick={() => {
+                    setShowRoomDetails(false);
+                    setHighlightedRoomId(null);
+                  }}
                   className="w-full bg-gray-100 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-200 transition-colors font-medium text-sm"
                 >
                   Fechar
