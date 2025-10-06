@@ -172,7 +172,7 @@ export interface ProjectContextType {
   isLoading: boolean;
   error: string | null;
   fetchProjects: () => Promise<void>;
-  fetchProject: (id: number) => Promise<void>;
+  fetchProject: (id: number) => Promise<Project>;
   createProject: (projectData: CreateProjectRequest) => Promise<Project>;
   updateProject: (id: number, projectData: UpdateProjectRequest) => Promise<Project>;
   deleteProject: (id: number) => Promise<void>;
