@@ -131,7 +131,7 @@ const MapCanvas: React.FC<MapCanvasProps> = ({
         style={{ userSelect: 'none' }}
       >
         {/* Grupo principal com transformações de zoom e pan */}
-        <g transform={`scale(${zoom}) translate(${pan.x / zoom}, ${pan.y / zoom})`}>
+        <g transform={`translate(${pan.x}, ${pan.y}) scale(${zoom})`}>
           {/* Imagem do mapa como fundo */}
           <image
             href="/mapa/mapa.jpeg"

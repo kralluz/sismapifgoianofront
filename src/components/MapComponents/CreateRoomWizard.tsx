@@ -20,6 +20,8 @@ interface RoomFormData {
   capacity: number;
   floor: number;
   building: string;
+  amenities: string[];
+  projects: number[];
 }
 
 interface CreateRoomWizardProps {
@@ -52,7 +54,10 @@ const CreateRoomWizard: React.FC<CreateRoomWizardProps> = ({
     capacity: 20,
     floor: 1,
     building: 'Campus Principal',
+    amenities: [],
+    projects: [],
   });
+  const [newAmenity, setNewAmenity] = useState('');
 
   const goToNextStep = () => {
     if (currentStep < 3) {
@@ -88,7 +93,6 @@ const CreateRoomWizard: React.FC<CreateRoomWizardProps> = ({
       await onCreateRoom(roomData, tracedPath, roomPosition);
       onComplete();
     } catch (error) {
-      console.error('Erro ao criar sala:', error);
     } finally {
       setIsSubmitting(false);
     }
@@ -219,6 +223,63 @@ const CreateRoomWizard: React.FC<CreateRoomWizardProps> = ({
                 />
               </div>
             </div>
+
+            {/* Amenities */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Comodidades
+              </label>
+              <div className="flex gap-2 mb-2">
+                <input
+                  type="text"
+                  value={newAmenity}
+                  onChange={(e) => setNewAmenity(e.target.value)}
+                  onKeyPress={(e) => {
+                    if (e.key === 'Enter' && newAmenity.trim()) {
+                      e.preventDefault();
+                      setRoomData({ ...roomData, amenities: [...roomData.amenities, newAmenity.trim()] });
+                      setNewAmenity('');
+                    }
+                  }}
+                  className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  placeholder="Ex: Projetor, Ar condicionado..."
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (newAmenity.trim()) {
+                      setRoomData({ ...roomData, amenities: [...roomData.amenities, newAmenity.trim()] });
+                      setNewAmenity('');
+                    }
+                  }}
+                  className="px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                >
+                  <Plus className="w-4 h-4" />
+                </button>
+              </div>
+              {roomData.amenities.length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  {roomData.amenities.map((amenity, index) => (
+                    <span
+                      key={index}
+                      className="inline-flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-700 text-sm rounded-lg"
+                    >
+                      {amenity}
+                      <button
+                        type="button"
+                        onClick={() => setRoomData({
+                          ...roomData,
+                          amenities: roomData.amenities.filter((_, i) => i !== index)
+                        })}
+                        className="text-blue-500 hover:text-blue-700"
+                      >
+                        ×
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         )}
 
@@ -282,25 +343,69 @@ const CreateRoomWizard: React.FC<CreateRoomWizardProps> = ({
           </div>
         )}
 
-        {/* Step 3: Adicionar Projetos */}
+        {/* Step 3: Associar Projetos */}
         {currentStep === 3 && (
           <div className="space-y-4">
-            <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-              <h3 className="font-semibold text-green-900 mb-2">✅ Sala Criada!</h3>
-              <p className="text-sm text-green-700 mb-4">
-                A sala foi criada com sucesso. Agora você pode adicionar projetos que acontecem nesta sala.
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <h3 className="font-semibold text-blue-900 mb-2">📁 Associar Projetos (Opcional)</h3>
+              <p className="text-sm text-blue-700">
+                Associe projetos existentes a esta sala digitando os IDs separados por vírgula.
               </p>
             </div>
 
-            <div className="text-center py-8">
-              <Folder className="w-16 h-16 mx-auto text-gray-400 mb-4" />
-              <p className="text-sm text-gray-600 mb-4">
-                Nenhum projeto adicionado ainda
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                IDs dos Projetos (separados por vírgula)
+              </label>
+              <input
+                type="text"
+                value={roomData.projects.join(', ')}
+                onChange={(e) => {
+                  const ids = e.target.value
+                    .split(',')
+                    .map(id => parseInt(id.trim()))
+                    .filter(id => !isNaN(id));
+                  setRoomData({ ...roomData, projects: ids });
+                }}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                placeholder="Ex: 1, 2, 3"
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                Digite os IDs dos projetos que você deseja associar a esta sala
               </p>
-              <button className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
-                <Plus className="w-4 h-4" />
-                Adicionar Projeto
-              </button>
+            </div>
+
+            {roomData.projects.length > 0 && (
+              <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                <h4 className="font-medium text-green-900 mb-2">Projetos Selecionados:</h4>
+                <div className="flex flex-wrap gap-2">
+                  {roomData.projects.map((projectId) => (
+                    <span
+                      key={projectId}
+                      className="inline-flex items-center gap-1 px-3 py-1 bg-green-100 text-green-700 text-sm rounded-lg"
+                    >
+                      Projeto ID: {projectId}
+                      <button
+                        type="button"
+                        onClick={() => setRoomData({
+                          ...roomData,
+                          projects: roomData.projects.filter(id => id !== projectId)
+                        })}
+                        className="text-green-500 hover:text-green-700 font-bold"
+                      >
+                        ×
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div className="text-center py-4">
+              <Folder className="w-12 h-12 mx-auto text-gray-300 mb-2" />
+              <p className="text-xs text-gray-500">
+                Você também pode adicionar projetos depois de criar a sala
+              </p>
             </div>
           </div>
         )}

@@ -121,9 +121,7 @@ export interface CreateRoomRequest {
   description: string;
   capacity: number;
   type: string;
-  floor: number;
   building: string;
-  amenities: string[];
   path?: number[][];
 }
 

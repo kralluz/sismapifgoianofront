@@ -6,40 +6,37 @@ import {
   Navigate,
 } from "react-router-dom";
 import { useAuth } from "../provider/AuthContext";
-/// import Login from "../components/Login";
-import CampusMapMVP from "../CampusMap";
+import Login from "../components/Login";
 import UserList from "../components/UserList";
 import Layout from "../components/Layout";
-import SimpleMap from "../components/SimpleMap";
+import NewMap from "../components/NewMap";
 
 const AppRoutes: React.FC = () => {
-  const { user } = useAuth();
+  const { user, isAuthenticated } = useAuth();
 
   return (
     <Router>
       <Routes>
+        {/* Rota principal - Mapa Interativo (pública - todos podem visualizar) */}
+        <Route path="/" element={<NewMap />} />
+
         {/* Rota de Login - Pública */}
         <Route
           path="/login"
-          // element={isAuthenticated ? <Navigate to="/" replace /> : <Login />}
-          element={<Navigate to="/" />}
+          element={isAuthenticated ? <Navigate to="/" replace /> : <Login />}
         />
 
         {/* Rotas Protegidas com Layout */}
         <Route
-          path="/"
+          path="/admin"
           element={
-            // isAuthenticated ? (
-            <Layout />
-            /* ) : (
+            isAuthenticated ? (
+              <Layout />
+            ) : (
               <Navigate to="/login" replace />
-            ) */
+            )
           }
         >
-          {/* Rotas filhas que serão renderizadas dentro do Layout */}
-          <Route index element={<CampusMapMVP />} />
-          <Route path="mapa" element={<CampusMapMVP />} />
-
           {/* Administração - Apenas ADMs */}
           <Route
             path="usuarios"
@@ -52,9 +49,6 @@ const AppRoutes: React.FC = () => {
             }
           />
         </Route>
-
-        {/* Rota para o mapa simples - SEM layout, apenas visualização */}
-        <Route path="/mapa-simples" element={<SimpleMap />} />
 
         {/* Rota padrão para URLs não encontradas */}
         <Route path="*" element={<Navigate to="/" replace />} />

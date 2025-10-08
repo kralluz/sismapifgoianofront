@@ -1,7 +1,6 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  MapPin,
   Edit3,
   Route,
   Wifi,
@@ -10,6 +9,7 @@ import {
   LogOut,
 } from 'lucide-react';
 import { useAuth } from '../../provider/AuthContext';
+import institutoLogo from '../../assets/intitutoLogo.png';
 
 interface MapHeaderProps {
   isEditMode: boolean;
@@ -40,7 +40,13 @@ const MapHeader: React.FC<MapHeaderProps> = ({
       <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 lg:gap-6">
         <div className="min-w-0">
           <h1 className="font-bold flex items-center gap-2 leading-tight text-fluid-lg sm:text-fluid-xl">
-            <MapPin className="w-5 h-5 sm:w-6 sm:h-6 shrink-0" />
+            <img 
+              src={institutoLogo} 
+              alt="Logo IF" 
+              className="w-8 h-8 sm:w-10 sm:h-10 shrink-0 cursor-pointer hover:opacity-80 transition-opacity" 
+              onDoubleClick={() => navigate('/login')}
+              title="Duplo clique para fazer login"
+            />
             <span className="truncate">Campus IF - Mapa Interativo</span>
             {isEditMode && (
               <span className="bg-orange-500/90 px-2 py-0.5 rounded text-[0.65rem] sm:text-xs font-semibold tracking-wide whitespace-nowrap">
@@ -90,7 +96,7 @@ const MapHeader: React.FC<MapHeaderProps> = ({
               <button
                 onClick={() => {
                   logout();
-                  navigate('/login');
+                  navigate('/');
                 }}
                 className="flex items-center gap-2 px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg font-medium transition-colors bg-red-500 hover:bg-red-600 text-white text-sm sm:text-base"
               >
@@ -98,6 +104,17 @@ const MapHeader: React.FC<MapHeaderProps> = ({
                 <span className="hidden xs:inline">Sair</span>
               </button>
             </>
+          ) : user ? (
+            <button
+              onClick={() => {
+                logout();
+                navigate('/');
+              }}
+              className="flex items-center gap-2 px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg font-medium transition-colors bg-red-500 hover:bg-red-600 text-white text-sm sm:text-base"
+            >
+              <LogOut className="w-4 h-4" />
+              <span className="hidden xs:inline">Sair</span>
+            </button>
           ) : (
             <button
               onClick={() => navigate('/login')}

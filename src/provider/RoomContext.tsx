@@ -76,14 +76,11 @@ export const RoomProvider: React.FC<RoomProviderProps> = ({ children }) => {
         throw new Error('Coordenadas devem ser positivas');
       }
       
-      console.log('Creating room with data:', roomData);
       const newRoom = await api.createRoom(roomData);
-      console.log('Room created successfully:', newRoom);
       
       setRooms(prev => [...prev, newRoom]);
       return newRoom;
     } catch (err) {
-      console.error('Error creating room:', err);
       let errorMessage = 'Erro ao criar sala';
       
       if (err instanceof Error) {

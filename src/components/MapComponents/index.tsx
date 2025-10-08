@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          import React, { useState, useEffect } from 'react';
 import { api } from '../../services/api';
 import type { Room, CreateRoomRequest, Project, CreateProjectRequest } from '../../types';
 import MapSidebar from './MapSidebar';
@@ -35,6 +35,7 @@ const SimpleMap: React.FC = () => {
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+  const [panAtDragStart, setPanAtDragStart] = useState({ x: 0, y: 0 });
   const [hasMouseMoved, setHasMouseMoved] = useState(false);
 
   // Garantir token de desenvolvimento
@@ -51,10 +52,25 @@ const SimpleMap: React.FC = () => {
     }
   }, []);
 
-  // Carregar salas
+  // Usar useCallback para estabilizar a função loadRooms
+  const loadRooms = React.useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const roomsData = await api.getRooms();
+      // TODO: Carregar projetos para cada sala
+      setRooms(roomsData);
+    } catch (err) {
+      setError('Erro ao carregar salas do mapa');
+    } finally {
+      setLoading(false);
+    }
+  }, []); // Array vazio = função nunca muda
+
+  // Carregar salas - executa apenas uma vez na montagem
   useEffect(() => {
     loadRooms();
-  }, []);
+  }, [loadRooms]); // Seguro pois loadRooms é estável (useCallback)
 
   // Limpar mensagens
   useEffect(() => {
@@ -70,21 +86,6 @@ const SimpleMap: React.FC = () => {
       return () => clearTimeout(timer);
     }
   }, [error]);
-
-  const loadRooms = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const roomsData = await api.getRooms();
-      // TODO: Carregar projetos para cada sala
-      setRooms(roomsData);
-    } catch (err) {
-      console.error('Erro ao carregar salas:', err);
-      setError('Erro ao carregar salas do mapa');
-    } finally {
-      setLoading(false);
-    }
-  };
 
   // Handlers do mapa
   const handleMapClick = (e: React.MouseEvent<SVGSVGElement>) => {
@@ -128,11 +129,9 @@ const SimpleMap: React.FC = () => {
         description: data.description || `Sala ${data.name}`,
         type: data.type,
         capacity: data.capacity,
-        floor: data.floor,
         building: data.building,
         x: position.x,
         y: position.y,
-        amenities: [],
         path: path
       };
 
@@ -143,7 +142,6 @@ const SimpleMap: React.FC = () => {
       setIsTracingPath(false);
       await loadRooms();
     } catch (err) {
-      console.error('Erro ao criar sala:', err);
       setError('Erro ao criar sala');
       throw err;
     }
@@ -158,7 +156,6 @@ const SimpleMap: React.FC = () => {
       setSuccessMessage(`Sala "${room.name}" excluída com sucesso!`);
       await loadRooms();
     } catch (err) {
-      console.error('Erro ao excluir sala:', err);
       setError('Erro ao excluir sala');
     }
   };
@@ -172,7 +169,6 @@ const SimpleMap: React.FC = () => {
       setShowProjectForm(false);
       setProjectFormRoomId(null);
     } catch (err) {
-      console.error('Erro ao criar projeto:', err);
       setError('Erro ao criar projeto');
       throw err;
     }
@@ -186,7 +182,6 @@ const SimpleMap: React.FC = () => {
       setSuccessMessage('Projeto excluído com sucesso!');
       await loadRooms();
     } catch (err) {
-      console.error('Erro ao excluir projeto:', err);
       setError('Erro ao excluir projeto');
     }
   };
@@ -198,20 +193,24 @@ const SimpleMap: React.FC = () => {
       e.preventDefault();
       setIsDragging(true);
       setHasMouseMoved(false);
-      setDragStart({ x: e.clientX - pan.x, y: e.clientY - pan.y });
+      // Armazenar posição inicial em pixels de tela E o pan inicial
+      const startPos = { x: e.clientX, y: e.clientY };
+      const startPan = { x: pan.x, y: pan.y };
+      setDragStart(startPos);
+      setPanAtDragStart(startPan);
     }
   };
 
   const handleMouseMove = (e: React.MouseEvent<SVGSVGElement>) => {
+    const svg = e.currentTarget;
+    const rect = svg.getBoundingClientRect();
+    
+    // Converter coordenadas de tela para SVG para cursor position
+    const svgX = ((e.clientX - rect.left) / rect.width) * 100;
+    const svgY = ((e.clientY - rect.top) / rect.height) * 100;
+    
     // Atualizar posição do cursor quando estiver traçando
     if (isTracingPath && !isDragging) {
-      const svg = e.currentTarget;
-      const rect = svg.getBoundingClientRect();
-      
-      // Coordenadas do cursor relativas ao SVG
-      const svgX = ((e.clientX - rect.left) / rect.width) * 100;
-      const svgY = ((e.clientY - rect.top) / rect.height) * 100;
-      
       // Aplicar transformação inversa do zoom e pan
       const x = (svgX - pan.x) / zoom;
       const y = (svgY - pan.y) / zoom;
@@ -228,17 +227,25 @@ const SimpleMap: React.FC = () => {
     
     setHasMouseMoved(true);
     
-    const deltaX = (e.clientX - dragStart.x) * 0.1;
-    const deltaY = (e.clientY - dragStart.y) * 0.1;
-    const newPanX = pan.x + deltaX;
-    const newPanY = pan.y + deltaY;
+    // Calcular delta em PIXELS desde o início do drag
+    const deltaPixelsX = e.clientX - dragStart.x;
+    const deltaPixelsY = e.clientY - dragStart.y;
     
-    const maxPan = 200 * zoom;
-    const limitedPanX = Math.max(-maxPan, Math.min(maxPan, newPanX));
-    const limitedPanY = Math.max(-maxPan, Math.min(maxPan, newPanY));
+    // Converter pixels para unidades do viewBox SVG
+    // ViewBox é 0-100, então precisamos normalizar
+    // Fator de sensibilidade: reduzir para tornar o movimento mais suave
+    const SENSITIVITY = 0.5; // Reduz o movimento pela metade
     
-    setPan({ x: limitedPanX, y: limitedPanY });
-    setDragStart({ x: e.clientX, y: e.clientY });
+    const deltaSvgX = ((deltaPixelsX / rect.width) * 100 * SENSITIVITY) / zoom;
+    const deltaSvgY = ((deltaPixelsY / rect.height) * 100 * SENSITIVITY) / zoom;
+    
+    // Aplicar o delta ao PAN INICIAL
+    const newPan = {
+      x: panAtDragStart.x + deltaSvgX,
+      y: panAtDragStart.y + deltaSvgY
+    };
+    
+    setPan(newPan);
   };
 
   const handleMouseUp = () => {
@@ -274,18 +281,16 @@ const SimpleMap: React.FC = () => {
           setSelectedRoom(room);
           setShowRoomDetails(true);
         }}
-        onRoomEdit={(room) => {
+        onRoomEdit={(_room) => {
           // TODO: Implementar edição
-          console.log('Editar sala:', room);
         }}
         onRoomDelete={handleDeleteRoom}
         onProjectCreate={(roomId) => {
           setProjectFormRoomId(roomId);
           setShowProjectForm(true);
         }}
-        onProjectEdit={(project) => {
+        onProjectEdit={(_project) => {
           // TODO: Implementar edição de projeto
-          console.log('Editar projeto:', project);
         }}
         onProjectDelete={handleDeleteProject}
         isTracingPath={isTracingPath}

@@ -10,5 +10,8 @@ export default defineConfig({
     hmr: {
       port: 5173
     }
+  },
+  resolve: {
+    dedupe: ['react', 'react-dom']
   }
 })

@@ -128,18 +128,14 @@ const InteractiveMapSVG: React.FC<InteractiveMapSVGProps> = ({
         viewBox="0 0 100 100"
         preserveAspectRatio="xMidYMid meet"
         onClick={(e) => {
-          console.log('SVG clicked!', e.target, e.currentTarget);
           // Only trigger if click is directly on SVG background or image
           const target = e.target as Element;
           const isBackground = target === e.currentTarget || target.tagName === 'image';
           
           if (isBackground && !isDragging) {
-            console.log('Valid click on background, calling onMapClick');
             e.preventDefault();
             e.stopPropagation();
             onMapClick(e);
-          } else {
-            console.log('Click ignored:', { isBackground, isDragging, target: target.tagName });
           }
         }}
         onMouseDown={handleMouseDown}

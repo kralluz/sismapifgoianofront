@@ -173,7 +173,6 @@ export const api = {
 
   createRoom: async (roomData: CreateRoomRequest): Promise<Room> => {
     try {
-      console.log('Sending room data to API:', roomData);
       const response = await fetch(`${API_BASE_URL}/api/room`, {
         method: "POST",
         headers: getAuthHeaders(),
@@ -182,7 +181,6 @@ export const api = {
       
       if (!response.ok) {
         const errorData = await response.text();
-        console.error('API Error Response:', response.status, errorData);
         
         if (response.status === 401) {
           throw new Error("Não autorizado. Faça login novamente.");
@@ -201,10 +199,8 @@ export const api = {
       }
       
       const result = await response.json();
-      console.log('Room created successfully:', result);
       return result;
     } catch (error) {
-      console.error('Error in createRoom:', error);
       if (error instanceof Error) {
         throw error;
       }

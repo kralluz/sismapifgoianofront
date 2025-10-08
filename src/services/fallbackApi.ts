@@ -1,5 +1,7 @@
 import type { Room } from "../types";
-import campusData from "../campusMapData.json";
+
+// Mock data for fallback
+const campusData: any[] = [];
 
 // Convert local data to match Room interface
 const convertLocalDataToRoom = (localRoom: any): Room => ({
@@ -25,7 +27,7 @@ export const fallbackApi = {
 
   getRoom: async (id: string): Promise<Room> => {
     await new Promise(resolve => setTimeout(resolve, 100));
-    const room = campusData.find(r => r.id === id);
+    const room = campusData.find((r: any) => r.id === id);
     if (!room) throw new Error("Sala não encontrada");
     return convertLocalDataToRoom(room);
   },
@@ -44,7 +46,7 @@ export const fallbackApi = {
     return { id: parseInt(id), ...roomData };
   },
 
-  deleteRoom: async (id: string): Promise<void> => {
+  deleteRoom: async (_id: string): Promise<void> => {
     await new Promise(resolve => setTimeout(resolve, 100));
     // Simulate successful deletion
   }
