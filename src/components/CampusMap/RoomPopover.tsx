@@ -8,6 +8,8 @@ import {
   Utensils,
   Users,
   MapPin,
+  Edit3,
+  Trash2,
 } from 'lucide-react';
 
 interface RoomPopoverProps {
@@ -15,6 +17,9 @@ interface RoomPopoverProps {
   event?: Event | null;
   position: { left: string; top: string };
   onClose: () => void;
+  onEdit?: (room: Room) => void;
+  onDelete?: (room: Room) => void;
+  isLoggedIn?: boolean;
 }
 
 const RoomPopover: React.FC<RoomPopoverProps> = ({
@@ -22,6 +27,9 @@ const RoomPopover: React.FC<RoomPopoverProps> = ({
   event,
   position,
   onClose,
+  onEdit,
+  onDelete,
+  isLoggedIn = false,
 }) => {
   const getRoomIcon = (type: string) => {
     const icons: Record<string, any> = {
@@ -115,6 +123,38 @@ const RoomPopover: React.FC<RoomPopoverProps> = ({
               </span>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Botões de ação para usuários logados */}
+      {isLoggedIn && (onEdit || onDelete) && (
+        <div className="border-t pt-3 mt-3 flex gap-2">
+          {onEdit && (
+            <button
+              onClick={() => {
+                onEdit(room);
+                onClose();
+              }}
+              className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors text-sm font-medium"
+            >
+              <Edit3 className="w-4 h-4" />
+              Editar
+            </button>
+          )}
+          {onDelete && (
+            <button
+              onClick={() => {
+                if (confirm(`Tem certeza que deseja excluir a sala "${room.name}"?`)) {
+                  onDelete(room);
+                  onClose();
+                }
+              }}
+              className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg transition-colors text-sm font-medium"
+            >
+              <Trash2 className="w-4 h-4" />
+              Excluir
+            </button>
+          )}
         </div>
       )}
 

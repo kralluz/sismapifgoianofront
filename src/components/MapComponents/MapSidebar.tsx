@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { Search, Calendar, MapPin, ChevronRight, X, Plus, Edit, Trash2 } from 'lucide-react';
 import type { Room, Project } from '../../types';
 import CreateRoomForm from './CreateRoomForm';
+import EditRoomForm from './EditRoomForm';
 import ProjectForm from '../SimpleMap/ProjectForm';
 import { useAuth } from '../../provider/AuthContext';
 
@@ -33,6 +34,11 @@ interface MapSidebarProps {
   tracedPath: Array<[number, number]>;
   roomPosition: { x: number; y: number } | null;
   onCreateRoom: (data: any, path: Array<[number, number]>, position: { x: number; y: number }) => Promise<void>;
+  // Props para edição de sala
+  showEditRoomForm?: boolean;
+  roomToEdit?: Room | null;
+  onUpdateRoom?: (id: number, data: any, path: Array<[number, number]>, position: { x: number; y: number }) => Promise<void>;
+  onCancelEditRoom?: () => void;
 }
 
 const MapSidebar: React.FC<MapSidebarProps> = ({
@@ -42,6 +48,8 @@ const MapSidebar: React.FC<MapSidebarProps> = ({
   setSidebarMinimized,
   onRoomSelect,
   onProjectSelect,
+  onRoomEdit,
+  onRoomDelete,
   onProjectEdit,
   onProjectDelete,
   onProjectCreateSubmit,
@@ -51,9 +59,13 @@ const MapSidebar: React.FC<MapSidebarProps> = ({
   tracedPath,
   roomPosition,
   onCreateRoom,
+  showEditRoomForm = false,
+  roomToEdit,
+  onUpdateRoom,
+  onCancelEditRoom,
 }) => {
   const { user } = useAuth();
-  const isAdmin = user?.role === 'admin';
+  const isLoggedIn = !!user;
   const [showCreateWizard, setShowCreateWizard] = useState(false);
   const [showCreateProjectModal, setShowCreateProjectModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -199,8 +211,8 @@ const MapSidebar: React.FC<MapSidebarProps> = ({
           </div>
         )}
 
-        {/* Admin Actions */}
-        {!showCreateWizard && isAdmin && (
+        {/* User Actions - Criar Projeto/Sala */}
+        {!showCreateWizard && isLoggedIn && (
           <div className="flex gap-2 mt-3">
             {activeTab === 'projetos' && (
               <button
@@ -226,7 +238,23 @@ const MapSidebar: React.FC<MapSidebarProps> = ({
 
       {/* Content */}
       <div className="flex-1 overflow-y-auto">
-        {showCreateWizard ? (
+        {showEditRoomForm && roomToEdit && onUpdateRoom && onCancelEditRoom ? (
+          <div className="p-6 animate-in fade-in slide-in-from-right duration-500">
+            <EditRoomForm
+              room={roomToEdit}
+              onComplete={() => {
+                onCancelEditRoom();
+              }}
+              onCancel={onCancelEditRoom}
+              onStartTracing={onStartTracing}
+              onStopTracing={onStopTracing}
+              isTracingPath={isTracingPath}
+              tracedPath={tracedPath}
+              roomPosition={roomPosition}
+              onUpdateRoom={onUpdateRoom}
+            />
+          </div>
+        ) : showCreateWizard ? (
           <div className="p-6 animate-in fade-in slide-in-from-right duration-500">
             <CreateRoomForm
               onComplete={() => {
@@ -309,8 +337,8 @@ const MapSidebar: React.FC<MapSidebarProps> = ({
                   </div>
                 </div>
 
-                {/* Botões de Ação - Apenas para Admins */}
-                {isAdmin && (
+                {/* Botões de Ação - Apenas para Usuários Logados */}
+                {isLoggedIn && (
                   <div className="flex items-center gap-2 mt-3 pt-3 border-t border-gray-200 opacity-0 group-hover:opacity-100 transition-opacity">
                     <button
                       onClick={(e) => {
@@ -362,33 +390,65 @@ const MapSidebar: React.FC<MapSidebarProps> = ({
               {filteredRooms.map((room, index) => (
                 <div
                   key={room.id}
-                  onClick={() => {
-                    if (onRoomSelect) {
-                      onRoomSelect(room);
-                    }
-                  }}
-                  className="group relative bg-white border border-gray-200 rounded-xl p-4 cursor-pointer transition-all hover:shadow-md hover:border-blue-300 animate-in fade-in slide-in-from-bottom"
+                  className="group relative bg-white border border-gray-200 rounded-xl p-4 transition-all hover:shadow-md hover:border-blue-300 animate-in fade-in slide-in-from-bottom"
                   style={{ animationDelay: `${index * 50}ms`, animationDuration: '400ms' }}
                 >
-                  {/* Room Name */}
-                  <h3 className="font-semibold text-gray-900 mb-2 group-hover:text-blue-600 transition-colors">
-                    {room.name}
-                  </h3>
+                  <div 
+                    onClick={() => {
+                      if (onRoomSelect) {
+                        onRoomSelect(room);
+                      }
+                    }}
+                    className="cursor-pointer"
+                  >
+                    {/* Room Name */}
+                    <h3 className="font-semibold text-gray-900 mb-2 group-hover:text-blue-600 transition-colors">
+                      {room.name}
+                    </h3>
 
-                  {/* Room Description */}
-                  {room.description && (
-                    <p className="text-sm text-gray-600 mb-3 line-clamp-2">
-                      {room.description}
-                    </p>
-                  )}
+                    {/* Room Description */}
+                    {room.description && (
+                      <p className="text-sm text-gray-600 mb-3 line-clamp-2">
+                        {room.description}
+                      </p>
+                    )}
 
-                  {/* Projects Count */}
-                  <div className="flex items-center gap-2 text-xs text-gray-500">
-                    <Calendar className="w-3.5 h-3.5" />
-                    <span>
-                      {room.projects?.length || 0} {room.projects?.length === 1 ? 'projeto' : 'projetos'}
-                    </span>
+                    {/* Projects Count */}
+                    <div className="flex items-center gap-2 text-xs text-gray-500">
+                      <Calendar className="w-3.5 h-3.5" />
+                      <span>
+                        {room.projects?.length || 0} {room.projects?.length === 1 ? 'projeto' : 'projetos'}
+                      </span>
+                    </div>
                   </div>
+
+                  {/* Botões de Ação - Apenas para Usuários Logados */}
+                  {isLoggedIn && (
+                    <div className="flex items-center gap-2 mt-3 pt-3 border-t border-gray-200 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onRoomEdit(room);
+                        }}
+                        className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors"
+                        title="Editar sala"
+                      >
+                        <Edit className="w-3.5 h-3.5" />
+                        Editar
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onRoomDelete(room);
+                        }}
+                        className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-medium text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition-colors"
+                        title="Excluir sala"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        Excluir
+                      </button>
+                    </div>
+                  )}
 
                   {/* Hover Effect Indicator */}
                   <div className="absolute inset-x-0 bottom-0 h-1 bg-gradient-to-r from-green-500 to-emerald-500 rounded-b-xl opacity-0 group-hover:opacity-100 transition-opacity"></div>

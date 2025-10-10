@@ -42,6 +42,8 @@ const NewMap: React.FC = () => {
   );
   const [showEditProjectModal, setShowEditProjectModal] = useState(false);
   const [projectToEdit, setProjectToEdit] = useState<Project | null>(null);
+  const [showEditRoomForm, setShowEditRoomForm] = useState(false);
+  const [roomToEdit, setRoomToEdit] = useState<Room | null>(null);
 
   // Estados de interação com o mapa
   const [isTracingPath, setIsTracingPath] = useState(false);
@@ -191,14 +193,48 @@ const NewMap: React.FC = () => {
   };
 
   // Handlers de CRUD de sala
-  const handleDeleteRoom = async (room: Room) => {
-    if (!confirm(`Tem certeza que deseja excluir a sala "${room.name}"?`))
-      return;
+  const handleEditRoom = (room: Room) => {
+    setRoomToEdit(room);
+    setShowEditRoomForm(true);
+    setIsTracingPath(true); // Ativar modo de traçamento para edição
+  };
 
+  const handleUpdateRoom = async (
+    id: number, 
+    data: any, 
+    path: Array<[number, number]>, 
+    position: { x: number; y: number }
+  ) => {
+    try {
+      // Atualizar sala com dados, path e posição
+      const roomData = {
+        ...data,
+        x: position.x,
+        y: position.y,
+        path: path,
+      };
+      
+      await api.updateRoom(id.toString(), roomData);
+      setSuccessMessage(`Sala "${data.name}" atualizada com sucesso!`);
+      await loadRooms();
+      setShowEditRoomForm(false);
+      setRoomToEdit(null);
+      setShowRoomDetails(false);
+      setTracedPath([]);
+      setTempRoomPosition(null);
+      setIsTracingPath(false);
+    } catch (err) {
+      setError("Erro ao atualizar sala");
+      throw err;
+    }
+  };
+
+  const handleDeleteRoom = async (room: Room) => {
     try {
       await api.deleteRoom(room.id.toString());
       setSuccessMessage(`Sala "${room.name}" excluída com sucesso!`);
       await loadRooms();
+      setShowRoomDetails(false);
     } catch (err) {
       setError("Erro ao excluir sala");
     }
@@ -334,9 +370,7 @@ const NewMap: React.FC = () => {
           setSelectedProjectId(projectId);
           setSelectedRoom(room);
         }}
-        onRoomEdit={(_room) => {
-          // TODO: Implementar edição   
-        }}
+        onRoomEdit={handleEditRoom}
         onRoomDelete={handleDeleteRoom}
         onProjectCreate={(roomId) => {
           setProjectFormRoomId(roomId);
@@ -352,12 +386,24 @@ const NewMap: React.FC = () => {
         onStartTracing={() => setIsTracingPath(true)}
         onStopTracing={() => {
           setIsTracingPath(false);
-          setTracedPath([]);
-          setTempRoomPosition(null);
+          if (!showEditRoomForm) {
+            setTracedPath([]);
+            setTempRoomPosition(null);
+          }
         }}
         tracedPath={tracedPath}
         roomPosition={tempRoomPosition}
         onCreateRoom={handleCreateRoom}
+        showEditRoomForm={showEditRoomForm}
+        roomToEdit={roomToEdit}
+        onUpdateRoom={handleUpdateRoom}
+        onCancelEditRoom={() => {
+          setShowEditRoomForm(false);
+          setRoomToEdit(null);
+          setIsTracingPath(false);
+          setTracedPath([]);
+          setTempRoomPosition(null);
+        }}
       />
 
       {/* Canvas do Mapa */}
@@ -807,6 +853,9 @@ const NewMap: React.FC = () => {
         <RoomDetailsModal
           room={selectedRoom}
           onClose={() => setShowRoomDetails(false)}
+          onEdit={user ? handleEditRoom : undefined}
+          onDelete={user ? handleDeleteRoom : undefined}
+          isLoggedIn={!!user}
         />
       )}
 

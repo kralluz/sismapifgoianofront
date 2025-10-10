@@ -1,13 +1,16 @@
 import React from 'react';
 import type { Room } from '../../types';
-import { X, Info, Users, Building, Hash } from 'lucide-react';
+import { X, Info, Users, Building, Hash, Edit3, Trash2 } from 'lucide-react';
 
 interface RoomDetailsModalProps {
   room: Room;
   onClose: () => void;
+  onEdit?: (room: Room) => void;
+  onDelete?: (room: Room) => void;
+  isLoggedIn?: boolean;
 }
 
-const RoomDetailsModal: React.FC<RoomDetailsModalProps> = ({ room, onClose }) => {
+const RoomDetailsModal: React.FC<RoomDetailsModalProps> = ({ room, onClose, onEdit, onDelete, isLoggedIn = false }) => {
   return (
     <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
       <div className="bg-white rounded-lg shadow-2xl w-full max-w-md max-h-[90vh] overflow-y-auto">
@@ -121,14 +124,51 @@ const RoomDetailsModal: React.FC<RoomDetailsModalProps> = ({ room, onClose }) =>
             )}
           </div>
           
-          {/* Botão de fechar */}
+          {/* Botões de ação */}
           <div className="mt-6 pt-4 border-t border-gray-200">
-            <button 
-              onClick={onClose}
-              className="w-full bg-gray-100 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-200 transition-colors font-medium text-sm"
-            >
-              Fechar
-            </button>
+            {isLoggedIn && (onEdit || onDelete) ? (
+              <div className="flex gap-3">
+                <button 
+                  onClick={onClose}
+                  className="flex-1 bg-gray-100 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-200 transition-colors font-medium text-sm"
+                >
+                  Fechar
+                </button>
+                {onEdit && (
+                  <button 
+                    onClick={() => {
+                      onEdit(room);
+                      onClose();
+                    }}
+                    className="flex-1 flex items-center justify-center gap-2 bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition-colors font-medium text-sm"
+                  >
+                    <Edit3 className="w-4 h-4" />
+                    Editar
+                  </button>
+                )}
+                {onDelete && (
+                  <button 
+                    onClick={() => {
+                      if (confirm(`Tem certeza que deseja excluir a sala "${room.name}"?`)) {
+                        onDelete(room);
+                        onClose();
+                      }
+                    }}
+                    className="flex-1 flex items-center justify-center gap-2 bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600 transition-colors font-medium text-sm"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                    Excluir
+                  </button>
+                )}
+              </div>
+            ) : (
+              <button 
+                onClick={onClose}
+                className="w-full bg-gray-100 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-200 transition-colors font-medium text-sm"
+              >
+                Fechar
+              </button>
+            )}
           </div>
         </div>
       </div>
