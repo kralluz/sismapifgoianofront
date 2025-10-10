@@ -1,24 +1,24 @@
 import React, { useState } from 'react';
-import type { CreateProjectRequest } from '../../types';
-import { X, MapPin, Hash } from 'lucide-react';
+import type { Project, Room, UpdateProjectRequest } from '../../types';
+import { X, MapPin, Hash, Save } from 'lucide-react';
 
-interface ProjectFormProps {
-  roomId: number;
-  roomName: string;
-  onSubmit: (data: CreateProjectRequest) => Promise<void>;
+interface EditProjectModalProps {
+  project: Project;
+  rooms: Room[];
+  onSubmit: (id: number, data: UpdateProjectRequest) => Promise<void>;
   onCancel: () => void;
 }
 
-const ProjectForm: React.FC<ProjectFormProps> = ({
-  roomId,
-  roomName,
+const EditProjectModal: React.FC<EditProjectModalProps> = ({
+  project,
+  rooms,
   onSubmit,
   onCancel,
 }) => {
-  const [formData, setFormData] = useState<CreateProjectRequest>({
-    number: new Date().getFullYear(),
-    title: '',
-    roomId,
+  const [formData, setFormData] = useState<UpdateProjectRequest>({
+    number: project.number,
+    title: project.title,
+    roomId: project.roomId,
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -27,13 +27,18 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
     e.preventDefault();
     setErrorMessage(null);
     
+    if (!formData.roomId) {
+      setErrorMessage('Por favor, selecione uma sala');
+      return;
+    }
+    
     setIsSubmitting(true);
     try {
-      await onSubmit(formData);
-      onCancel(); // Fechar formulário após sucesso
+      await onSubmit(project.id, formData);
+      onCancel(); // Fechar modal após sucesso
     } catch (error) {
-      console.error('Erro ao criar projeto:', error);
-      setErrorMessage(error instanceof Error ? error.message : 'Erro ao criar projeto');
+      console.error('Erro ao atualizar projeto:', error);
+      setErrorMessage(error instanceof Error ? error.message : 'Erro ao atualizar projeto');
     } finally {
       setIsSubmitting(false);
     }
@@ -46,10 +51,9 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
           {/* Header */}
           <div className="flex items-center justify-between mb-6">
             <div>
-              <h2 className="text-lg font-bold text-gray-900">Novo Projeto</h2>
-              <p className="text-sm text-gray-500 flex items-center gap-1 mt-1">
-                <MapPin className="w-3 h-3" />
-                {roomName}
+              <h2 className="text-lg font-bold text-gray-900">Editar Projeto</h2>
+              <p className="text-sm text-gray-500 mt-1">
+                Projeto #{project.number}
               </p>
             </div>
             <button
@@ -69,6 +73,35 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
               </div>
             )}
 
+            {/* Select de Sala */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Sala *
+              </label>
+              <div className="relative">
+                <MapPin className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
+                <select
+                  required
+                  value={formData.roomId}
+                  onChange={(e) => setFormData({ ...formData, roomId: parseInt(e.target.value) })}
+                  className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 appearance-none bg-white"
+                >
+                  <option value="0">Selecione uma sala</option>
+                  {rooms.map((room) => (
+                    <option key={room.id} value={room.id}>
+                      {room.name} - {room.building}
+                    </option>
+                  ))}
+                </select>
+                <div className="absolute right-3 top-2.5 pointer-events-none">
+                  <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </div>
+              </div>
+            </div>
+
+            {/* Número do Projeto */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Número do Projeto *
@@ -87,6 +120,7 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
               </div>
             </div>
 
+            {/* Título do Projeto */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Título do Projeto *
@@ -97,7 +131,7 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
                 value={formData.title}
                 onChange={(e) => setFormData({ ...formData, title: e.target.value })}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                placeholder="Ex: Curso de React, Workshop de Python"
+                placeholder="Ex: Projeto de Extensão em Sistemas de Informação"
               />
             </div>
 
@@ -113,9 +147,19 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-blue-400 disabled:cursor-not-allowed transition-colors font-medium"
+                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-blue-400 disabled:cursor-not-allowed transition-colors font-medium flex items-center justify-center gap-2"
               >
-                {isSubmitting ? 'Criando...' : 'Criar Projeto'}
+                {isSubmitting ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    Salvando...
+                  </>
+                ) : (
+                  <>
+                    <Save className="w-4 h-4" />
+                    Salvar Alterações
+                  </>
+                )}
               </button>
             </div>
           </form>
@@ -125,4 +169,4 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
   );
 };
 
-export default ProjectForm;
+export default EditProjectModal;

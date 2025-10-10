@@ -8,10 +8,12 @@ import type {
   CreateRoomRequest,
   Project,
   CreateProjectRequest,
+  UpdateProjectRequest,
 } from "../types";
 import MapSidebar from "./MapComponents/MapSidebar";
 import RoomDetailsModal from "./MapComponents/RoomDetailsModal";
 import ProjectForm from "./MapComponents/ProjectForm";
+import EditProjectModal from "./MapComponents/EditProjectModal";
 import institutoLogo from "../assets/intitutoLogo.png";
 
 interface RoomWithProjects extends Room {
@@ -38,6 +40,8 @@ const NewMap: React.FC = () => {
   const [projectFormRoomId, setProjectFormRoomId] = useState<number | null>(
     null
   );
+  const [showEditProjectModal, setShowEditProjectModal] = useState(false);
+  const [projectToEdit, setProjectToEdit] = useState<Project | null>(null);
 
   // Estados de interação com o mapa
   const [isTracingPath, setIsTracingPath] = useState(false);
@@ -64,8 +68,20 @@ const NewMap: React.FC = () => {
     try {
       setLoading(true);
       setError(null);
-      const roomsData = await api.getRooms();
-      setRooms(roomsData);
+      
+      // Carregar salas e projetos em paralelo
+      const [roomsData, projectsData] = await Promise.all([
+        api.getRooms(),
+        api.getProjects()
+      ]);
+      
+      // Anexar projetos às salas baseado no roomId
+      const roomsWithProjects: RoomWithProjects[] = roomsData.map(room => ({
+        ...room,
+        projects: projectsData.filter(project => project.roomId === room.id)
+      }));
+      
+      setRooms(roomsWithProjects);
     } catch (err) {
       setError("Erro ao carregar salas do mapa");
     } finally {
@@ -202,6 +218,19 @@ const NewMap: React.FC = () => {
     }
   };
 
+  const handleUpdateProject = async (id: number, data: UpdateProjectRequest) => {
+    try {
+      await api.updateProject(id.toString(), data);
+      setSuccessMessage("Projeto atualizado com sucesso!");
+      await loadRooms();
+      setShowEditProjectModal(false);
+      setProjectToEdit(null);
+    } catch (err) {
+      setError("Erro ao atualizar projeto");
+      throw err;
+    }
+  };
+
   const handleDeleteProject = async (project: Project) => {
     if (
       !confirm(`Tem certeza que deseja excluir o projeto "${project.title}"?`)
@@ -313,10 +342,12 @@ const NewMap: React.FC = () => {
           setProjectFormRoomId(roomId);
           setShowProjectForm(true);
         }}
-        onProjectEdit={(_project) => {
-          // TODO: Implementar edição de projeto
+        onProjectEdit={(project) => {
+          setProjectToEdit(project);
+          setShowEditProjectModal(true);
         }}
         onProjectDelete={handleDeleteProject}
+        onProjectCreateSubmit={handleCreateProject}
         isTracingPath={isTracingPath}
         onStartTracing={() => setIsTracingPath(true)}
         onStopTracing={() => {
@@ -788,6 +819,19 @@ const NewMap: React.FC = () => {
           onCancel={() => {
             setShowProjectForm(false);
             setProjectFormRoomId(null);
+          }}
+        />
+      )}
+
+      {/* Modal de Editar Projeto */}
+      {showEditProjectModal && projectToEdit && (
+        <EditProjectModal
+          project={projectToEdit}
+          rooms={rooms}
+          onSubmit={handleUpdateProject}
+          onCancel={() => {
+            setShowEditProjectModal(false);
+            setProjectToEdit(null);
           }}
         />
       )}

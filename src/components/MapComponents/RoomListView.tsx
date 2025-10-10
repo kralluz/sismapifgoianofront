@@ -155,11 +155,16 @@ const RoomListView: React.FC<RoomListViewProps> = ({
                         className="bg-white border border-gray-200 rounded-lg p-2.5 flex items-center justify-between hover:border-blue-300 transition-colors"
                       >
                         <div className="flex-1 min-w-0">
-                          <h4 className="font-medium text-sm text-gray-900 truncate">
-                            {project.title}
-                          </h4>
+                          <div className="flex items-center gap-2">
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                              #{project.number}
+                            </span>
+                            <h4 className="font-medium text-sm text-gray-900 truncate">
+                              {project.title}
+                            </h4>
+                          </div>
                           <p className="text-xs text-gray-500 truncate mt-0.5">
-                            {project.type} • {new Date(project.startAt).toLocaleDateString('pt-BR')}
+                            {project.createdAt ? new Date(project.createdAt).toLocaleDateString('pt-BR') : 'Data não disponível'}
                           </p>
                         </div>
                         

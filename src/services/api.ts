@@ -234,52 +234,176 @@ export const api = {
   },
 
   getProjects: async (): Promise<Project[]> => {
-    const response = await fetch(`${API_BASE_URL}/api/project`, {
-      headers: getAuthHeadersNoContentType(),
-    });
-    if (!response.ok) throw new Error("Erro ao buscar projetos");
-    return response.json();
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/project`, {
+        headers: getAuthHeadersNoContentType(),
+      });
+      
+      if (!response.ok) {
+        if (response.status === 500) {
+          throw new Error("Erro interno do servidor ao buscar projetos");
+        }
+        throw new Error("Erro ao buscar projetos");
+      }
+      
+      return response.json();
+    } catch (error) {
+      if (error instanceof Error) {
+        throw error;
+      }
+      throw new Error("Erro ao buscar projetos");
+    }
   },
 
   getProject: async (id: string): Promise<Project> => {
-    const response = await fetch(`${API_BASE_URL}/api/project/${id}`, {
-      headers: getAuthHeadersNoContentType(),
-    });
-    if (!response.ok) throw new Error("Erro ao buscar projeto");
-    return response.json();
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/project/${id}`, {
+        headers: getAuthHeadersNoContentType(),
+      });
+      
+      if (!response.ok) {
+        if (response.status === 401) {
+          throw new Error("Não autorizado. Faça login novamente.");
+        } else if (response.status === 403) {
+          throw new Error("Acesso negado.");
+        } else if (response.status === 404) {
+          throw new Error("Projeto não encontrado");
+        } else if (response.status === 500) {
+          throw new Error("Erro interno do servidor.");
+        }
+        throw new Error("Erro ao buscar projeto");
+      }
+      
+      return response.json();
+    } catch (error) {
+      if (error instanceof Error) {
+        throw error;
+      }
+      throw new Error("Erro ao buscar projeto");
+    }
   },
 
   createProject: async (projectData: CreateProjectRequest): Promise<Project> => {
-    const response = await fetch(`${API_BASE_URL}/api/project`, {
-      method: "POST",
-      headers: getAuthHeaders(),
-      body: JSON.stringify(projectData),
-    });
-    if (!response.ok) throw new Error("Erro ao criar projeto");
-    return response.json();
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/project`, {
+        method: "POST",
+        headers: getAuthHeaders(),
+        body: JSON.stringify(projectData),
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.text();
+        
+        if (response.status === 401) {
+          throw new Error("Não autorizado. Faça login novamente.");
+        } else if (response.status === 403) {
+          throw new Error("Acesso negado.");
+        } else if (response.status === 400) {
+          try {
+            const jsonError = JSON.parse(errorData);
+            throw new Error(jsonError.error || "Dados inválidos fornecidos");
+          } catch {
+            throw new Error("Dados inválidos fornecidos");
+          }
+        } else if (response.status === 500) {
+          throw new Error("Erro interno do servidor. Tente novamente.");
+        }
+        
+        throw new Error(`Erro ${response.status}: ${errorData || 'Erro ao criar projeto'}`);
+      }
+      
+      return response.json();
+    } catch (error) {
+      if (error instanceof Error) {
+        throw error;
+      }
+      throw new Error("Erro ao criar projeto");
+    }
   },
 
   updateProject: async (id: string, projectData: UpdateProjectRequest): Promise<Project> => {
-    const response = await fetch(`${API_BASE_URL}/api/project/${id}`, {
-      method: "PUT",
-      headers: getAuthHeaders(),
-      body: JSON.stringify(projectData),
-    });
-    if (!response.ok) throw new Error("Erro ao atualizar projeto");
-    return response.json();
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/project/${id}`, {
+        method: "PUT",
+        headers: getAuthHeaders(),
+        body: JSON.stringify(projectData),
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.text();
+        
+        if (response.status === 401) {
+          throw new Error("Não autorizado. Faça login novamente.");
+        } else if (response.status === 403) {
+          throw new Error("Acesso negado.");
+        } else if (response.status === 404) {
+          throw new Error("Projeto não encontrado");
+        } else if (response.status === 400) {
+          try {
+            const jsonError = JSON.parse(errorData);
+            throw new Error(jsonError.error || "Dados inválidos fornecidos");
+          } catch {
+            throw new Error("Dados inválidos fornecidos");
+          }
+        } else if (response.status === 500) {
+          throw new Error("Erro interno do servidor.");
+        }
+        
+        throw new Error(`Erro ${response.status}: ${errorData || 'Erro ao atualizar projeto'}`);
+      }
+      
+      return response.json();
+    } catch (error) {
+      if (error instanceof Error) {
+        throw error;
+      }
+      throw new Error("Erro ao atualizar projeto");
+    }
   },
 
   deleteProject: async (id: string): Promise<void> => {
-    const response = await fetch(`${API_BASE_URL}/api/project/${id}`, {
-      method: "DELETE",
-      headers: getAuthHeadersNoContentType(),
-    });
-    if (!response.ok) throw new Error("Erro ao deletar projeto");
-    if (response.status === 204) return;
     try {
-      return await response.json();
-    } catch {
-      return;
+      const response = await fetch(`${API_BASE_URL}/api/project/${id}`, {
+        method: "DELETE",
+        headers: getAuthHeadersNoContentType(),
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.text();
+        
+        if (response.status === 401) {
+          throw new Error("Não autorizado. Faça login novamente.");
+        } else if (response.status === 403) {
+          throw new Error("Acesso negado.");
+        } else if (response.status === 404) {
+          throw new Error("Projeto não encontrado");
+        } else if (response.status === 400) {
+          try {
+            const jsonError = JSON.parse(errorData);
+            throw new Error(jsonError.error || "Erro ao deletar projeto");
+          } catch {
+            throw new Error("Erro ao deletar projeto");
+          }
+        } else if (response.status === 500) {
+          throw new Error("Erro interno do servidor.");
+        }
+        
+        throw new Error(`Erro ${response.status}: ${errorData || 'Erro ao deletar projeto'}`);
+      }
+      
+      // 204 No Content - Sucesso
+      if (response.status === 204) return;
+      
+      try {
+        return await response.json();
+      } catch {
+        return;
+      }
+    } catch (error) {
+      if (error instanceof Error) {
+        throw error;
+      }
+      throw new Error("Erro ao deletar projeto");
     }
   },
 

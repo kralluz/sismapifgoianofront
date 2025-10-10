@@ -44,10 +44,8 @@ const ExampleUsage: React.FC = () => {
   const handleCreateProject = async () => {
     try {
       await createProject({
+        number: new Date().getFullYear(),
         title: "Sistema de Gestão Acadêmica",
-        type: "Desenvolvimento de Software",
-        startAt: "2025-01-15T09:00:00Z",
-        endAt: "2025-03-15T18:00:00Z",
         roomId: 1,
       });
     } catch (error) {}
@@ -87,7 +85,7 @@ const ExampleUsage: React.FC = () => {
         <ul>
           {projects.map((project) => (
             <li key={project.id}>
-              {project.title} - {project.type}
+              #{project.number} - {project.title}
             </li>
           ))}
         </ul>

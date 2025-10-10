@@ -122,6 +122,8 @@ export interface CreateRoomRequest {
   capacity: number;
   type: string;
   building: string;
+  floor?: number;
+  amenities?: string[];
   path?: number[][];
 }
 
@@ -144,21 +146,17 @@ export interface RoomContextType {
 // Tipos para Projects
 export interface Project {
   id: number;
+  number: number;
   title: string;
-  type: string;
-  startAt: string;
-  endAt: string;
   roomId: number;
-  room?: Room;
+  room?: Room; // Objeto completo da sala (retornado pela API)
   createdAt?: string;
   updatedAt?: string;
 }
 
 export interface CreateProjectRequest {
+  number: number;
   title: string;
-  type: string;
-  startAt: string;
-  endAt: string;
   roomId: number;
 }
 

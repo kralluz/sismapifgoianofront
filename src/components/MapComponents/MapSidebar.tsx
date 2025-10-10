@@ -1,7 +1,8 @@
 import React, { useState, useMemo } from 'react';
-import { Search, Calendar, MapPin, Clock, ChevronRight, X, Plus } from 'lucide-react';
+import { Search, Calendar, MapPin, ChevronRight, X, Plus, Edit, Trash2 } from 'lucide-react';
 import type { Room, Project } from '../../types';
 import CreateRoomForm from './CreateRoomForm';
+import ProjectForm from '../SimpleMap/ProjectForm';
 import { useAuth } from '../../provider/AuthContext';
 
 interface RoomWithProjects extends Room {
@@ -20,6 +21,11 @@ interface MapSidebarProps {
   onProjectCreate: (roomId: number) => void;
   onProjectEdit: (project: Project) => void;
   onProjectDelete: (project: Project) => void;
+  onProjectCreateSubmit?: (projectData: {
+    number: number;
+    title: string;
+    roomId: number;
+  }) => Promise<void>;
   // Props para o wizard
   isTracingPath: boolean;
   onStartTracing: () => void;
@@ -36,6 +42,9 @@ const MapSidebar: React.FC<MapSidebarProps> = ({
   setSidebarMinimized,
   onRoomSelect,
   onProjectSelect,
+  onProjectEdit,
+  onProjectDelete,
+  onProjectCreateSubmit,
   isTracingPath,
   onStartTracing,
   onStopTracing,
@@ -46,6 +55,7 @@ const MapSidebar: React.FC<MapSidebarProps> = ({
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin';
   const [showCreateWizard, setShowCreateWizard] = useState(false);
+  const [showCreateProjectModal, setShowCreateProjectModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const [activeTab, setActiveTab] = useState<'projetos' | 'salas'>('projetos');
@@ -70,7 +80,7 @@ const MapSidebar: React.FC<MapSidebarProps> = ({
     const query = searchQuery.toLowerCase();
     return allProjects.filter(project => 
       project.title.toLowerCase().includes(query) ||
-      project.type.toLowerCase().includes(query) ||
+      `#${project.number}`.toLowerCase().includes(query) ||
       project.room.name.toLowerCase().includes(query)
     );
   }, [allProjects, searchQuery]);
@@ -94,16 +104,6 @@ const MapSidebar: React.FC<MapSidebarProps> = ({
     if (onProjectSelect) {
       onProjectSelect(project.id, project.room);
     }
-  };
-
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' });
-  };
-
-  const formatTime = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
   };
 
   if (sidebarMinimized) {
@@ -201,13 +201,26 @@ const MapSidebar: React.FC<MapSidebarProps> = ({
 
         {/* Admin Actions */}
         {!showCreateWizard && isAdmin && (
-          <button
-            onClick={() => setShowCreateWizard(true)}
-            className="w-full mt-3 flex items-center justify-center gap-2 px-4 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl hover:from-blue-700 hover:to-indigo-700 transition-all shadow-sm hover:shadow-md font-medium text-sm"
-          >
-            <Plus className="w-4 h-4" />
-            Nova Sala
-          </button>
+          <div className="flex gap-2 mt-3">
+            {activeTab === 'projetos' && (
+              <button
+                onClick={() => setShowCreateProjectModal(true)}
+                className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-xl hover:from-purple-700 hover:to-pink-700 transition-all shadow-sm hover:shadow-md font-medium text-sm"
+              >
+                <Plus className="w-4 h-4" />
+                Novo Projeto
+              </button>
+            )}
+            {activeTab === 'salas' && (
+              <button
+                onClick={() => setShowCreateWizard(true)}
+                className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl hover:from-blue-700 hover:to-indigo-700 transition-all shadow-sm hover:shadow-md font-medium text-sm"
+              >
+                <Plus className="w-4 h-4" />
+                Nova Sala
+              </button>
+            )}
+          </div>
         )}
       </div>
 
@@ -260,46 +273,69 @@ const MapSidebar: React.FC<MapSidebarProps> = ({
               {filteredProjects.map((project, index) => (
                 <div
                   key={project.id}
-                  onClick={() => handleProjectClick(project)}
-                  className={`group relative bg-white border rounded-xl p-4 cursor-pointer transition-all hover:shadow-md hover:border-blue-300 animate-in fade-in slide-in-from-bottom ${
+                  className={`group relative bg-white border rounded-xl p-4 transition-all hover:shadow-md hover:border-blue-300 animate-in fade-in slide-in-from-bottom ${
                     selectedProject?.id === project.id
                       ? 'border-blue-500 shadow-md bg-blue-50/50'
                       : 'border-gray-200'
                   }`}
                   style={{ animationDelay: `${index * 50}ms`, animationDuration: '400ms' }}
                 >
-                {/* Project Type Badge */}
-                <div className="flex items-start justify-between mb-2">
-                  <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-medium bg-gradient-to-r from-purple-100 to-pink-100 text-purple-700">
-                    {project.type}
-                  </span>
-                  {selectedProject?.id === project.id && (
-                    <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
-                  )}
-                </div>
+                <div onClick={() => handleProjectClick(project)} className="cursor-pointer">
+                  {/* Project Number Badge */}
+                  <div className="flex items-start justify-between mb-2">
+                    <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-medium bg-gradient-to-r from-purple-100 to-pink-100 text-purple-700">
+                      #{project.number}
+                    </span>
+                    {selectedProject?.id === project.id && (
+                      <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
+                    )}
+                  </div>
 
-                {/* Project Title */}
-                <h3 className="font-semibold text-gray-900 mb-3 line-clamp-2 group-hover:text-blue-600 transition-colors">
-                  {project.title}
-                </h3>
+                  {/* Project Title */}
+                  <h3 className="font-semibold text-gray-900 mb-3 line-clamp-2 group-hover:text-blue-600 transition-colors">
+                    {project.title}
+                  </h3>
 
-                {/* Location */}
-                <div className="flex items-center gap-2 text-sm text-gray-600 mb-2">
-                  <MapPin className="w-4 h-4 text-gray-400" />
-                  <span className="truncate">{project.room.name}</span>
-                </div>
+                  {/* Location */}
+                  <div className="flex items-center gap-2 text-sm text-gray-600 mb-2">
+                    <MapPin className="w-4 h-4 text-gray-400" />
+                    <span className="truncate">{project.room.name}</span>
+                  </div>
 
-                {/* Date & Time */}
-                <div className="flex items-center gap-4 text-xs text-gray-500">
-                  <div className="flex items-center gap-1.5">
+                  {/* Created Date */}
+                  <div className="flex items-center gap-1.5 text-xs text-gray-500">
                     <Calendar className="w-3.5 h-3.5" />
-                    <span>{formatDate(project.startAt)}</span>
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <Clock className="w-3.5 h-3.5" />
-                    <span>{formatTime(project.startAt)}</span>
+                    <span>{project.createdAt ? new Date(project.createdAt).toLocaleDateString('pt-BR') : 'Data não disponível'}</span>
                   </div>
                 </div>
+
+                {/* Botões de Ação - Apenas para Admins */}
+                {isAdmin && (
+                  <div className="flex items-center gap-2 mt-3 pt-3 border-t border-gray-200 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onProjectEdit(project);
+                      }}
+                      className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors"
+                      title="Editar projeto"
+                    >
+                      <Edit className="w-3.5 h-3.5" />
+                      Editar
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onProjectDelete(project);
+                      }}
+                      className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-medium text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition-colors"
+                      title="Excluir projeto"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      Excluir
+                    </button>
+                  </div>
+                )}
 
                 {/* Hover Effect Indicator */}
                 <div className="absolute inset-x-0 bottom-0 h-1 bg-gradient-to-r from-blue-500 to-indigo-500 rounded-b-xl opacity-0 group-hover:opacity-100 transition-opacity"></div>
@@ -377,6 +413,20 @@ const MapSidebar: React.FC<MapSidebarProps> = ({
             </div>
           </div>
         </div>
+      )}
+
+      {/* Modal de Criar Projeto */}
+      {showCreateProjectModal && rooms.length > 0 && (
+        <ProjectForm
+          rooms={rooms}
+          onSubmit={async (projectData) => {
+            if (onProjectCreateSubmit) {
+              await onProjectCreateSubmit(projectData);
+              setShowCreateProjectModal(false);
+            }
+          }}
+          onCancel={() => setShowCreateProjectModal(false)}
+        />
       )}
     </div>
   );

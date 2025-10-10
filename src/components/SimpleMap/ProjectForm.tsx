@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
-import type { CreateProjectRequest } from '../../types';
+import type { CreateProjectRequest, Room } from '../../types';
 import { X, MapPin, Hash } from 'lucide-react';
 
 interface ProjectFormProps {
-  roomId: number;
-  roomName: string;
+  roomId?: number;
+  roomName?: string;
+  rooms?: Room[];
   onSubmit: (data: CreateProjectRequest) => Promise<void>;
   onCancel: () => void;
 }
@@ -12,13 +13,14 @@ interface ProjectFormProps {
 const ProjectForm: React.FC<ProjectFormProps> = ({
   roomId,
   roomName,
+  rooms = [],
   onSubmit,
   onCancel,
 }) => {
   const [formData, setFormData] = useState<CreateProjectRequest>({
     number: new Date().getFullYear(),
     title: '',
-    roomId,
+    roomId: roomId || 0,
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -26,6 +28,11 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage(null);
+    
+    if (!formData.roomId) {
+      setErrorMessage('Por favor, selecione uma sala');
+      return;
+    }
     
     setIsSubmitting(true);
     try {
@@ -47,10 +54,16 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
           <div className="flex items-center justify-between mb-6">
             <div>
               <h2 className="text-lg font-bold text-gray-900">Novo Projeto</h2>
-              <p className="text-sm text-gray-500 flex items-center gap-1 mt-1">
-                <MapPin className="w-3 h-3" />
-                {roomName}
-              </p>
+              {roomName ? (
+                <p className="text-sm text-gray-500 flex items-center gap-1 mt-1">
+                  <MapPin className="w-3 h-3" />
+                  {roomName}
+                </p>
+              ) : (
+                <p className="text-sm text-gray-500 mt-1">
+                  Adicionar projeto a uma sala
+                </p>
+              )}
             </div>
             <button
               onClick={onCancel}
@@ -66,6 +79,36 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
             {errorMessage && (
               <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
                 <p className="text-sm text-red-800">{errorMessage}</p>
+              </div>
+            )}
+
+            {/* Select de Sala (se não foi pré-selecionada) */}
+            {!roomId && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Sala *
+                </label>
+                <div className="relative">
+                  <MapPin className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
+                  <select
+                    required
+                    value={formData.roomId}
+                    onChange={(e) => setFormData({ ...formData, roomId: parseInt(e.target.value) })}
+                    className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 appearance-none bg-white"
+                  >
+                    <option value="0">Selecione uma sala</option>
+                    {rooms.map((room) => (
+                      <option key={room.id} value={room.id}>
+                        {room.name} - {room.building}
+                      </option>
+                    ))}
+                  </select>
+                  <div className="absolute right-3 top-2.5 pointer-events-none">
+                    <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </div>
+                </div>
               </div>
             )}
 
@@ -97,7 +140,7 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
                 value={formData.title}
                 onChange={(e) => setFormData({ ...formData, title: e.target.value })}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                placeholder="Ex: Curso de React, Workshop de Python"
+                placeholder="Ex: Projeto de Extensão em Sistemas de Informação"
               />
             </div>
 
