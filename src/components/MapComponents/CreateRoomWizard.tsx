@@ -99,7 +99,7 @@ const CreateRoomWizard: React.FC<CreateRoomWizardProps> = ({
   };
 
   return (
-    <div className="h-full flex flex-col">
+    <div className="h-full flex flex-col" onClick={(e) => e.stopPropagation()} onMouseDown={(e) => e.stopPropagation()}>
       {/* Header com Steps */}
       <div className="p-4 border-b border-gray-200 bg-white">
         <h2 className="text-lg font-bold text-gray-900 mb-4">Nova Sala</h2>
