@@ -149,6 +149,8 @@ const CreateRoomWizard: React.FC<CreateRoomWizardProps> = ({
                 required
                 value={roomData.name}
                 onChange={(e) => setRoomData({ ...roomData, name: e.target.value })}
+                onClick={(e) => e.stopPropagation()}
+                onMouseDown={(e) => e.stopPropagation()}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 placeholder="Ex: Sala 101, Laboratório A"
               />
@@ -161,6 +163,8 @@ const CreateRoomWizard: React.FC<CreateRoomWizardProps> = ({
               <textarea
                 value={roomData.description}
                 onChange={(e) => setRoomData({ ...roomData, description: e.target.value })}
+                onClick={(e) => e.stopPropagation()}
+                onMouseDown={(e) => e.stopPropagation()}
                 rows={3}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 placeholder="Descrição do local..."
@@ -175,6 +179,8 @@ const CreateRoomWizard: React.FC<CreateRoomWizardProps> = ({
                 <select
                   value={roomData.type}
                   onChange={(e) => setRoomData({ ...roomData, type: e.target.value as any })}
+                  onClick={(e) => e.stopPropagation()}
+                  onMouseDown={(e) => e.stopPropagation()}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 >
                   <option value="classroom">Sala de Aula</option>
@@ -195,6 +201,8 @@ const CreateRoomWizard: React.FC<CreateRoomWizardProps> = ({
                   min={1}
                   value={roomData.capacity}
                   onChange={(e) => setRoomData({ ...roomData, capacity: Number(e.target.value) })}
+                  onClick={(e) => e.stopPropagation()}
+                  onMouseDown={(e) => e.stopPropagation()}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 />
               </div>
@@ -207,6 +215,8 @@ const CreateRoomWizard: React.FC<CreateRoomWizardProps> = ({
                   type="number"
                   value={roomData.floor}
                   onChange={(e) => setRoomData({ ...roomData, floor: Number(e.target.value) })}
+                  onClick={(e) => e.stopPropagation()}
+                  onMouseDown={(e) => e.stopPropagation()}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 />
               </div>
@@ -219,6 +229,8 @@ const CreateRoomWizard: React.FC<CreateRoomWizardProps> = ({
                   type="text"
                   value={roomData.building}
                   onChange={(e) => setRoomData({ ...roomData, building: e.target.value })}
+                  onClick={(e) => e.stopPropagation()}
+                  onMouseDown={(e) => e.stopPropagation()}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 />
               </div>
@@ -234,6 +246,8 @@ const CreateRoomWizard: React.FC<CreateRoomWizardProps> = ({
                   type="text"
                   value={newAmenity}
                   onChange={(e) => setNewAmenity(e.target.value)}
+                  onClick={(e) => e.stopPropagation()}
+                  onMouseDown={(e) => e.stopPropagation()}
                   onKeyPress={(e) => {
                     if (e.key === 'Enter' && newAmenity.trim()) {
                       e.preventDefault();
@@ -367,6 +381,8 @@ const CreateRoomWizard: React.FC<CreateRoomWizardProps> = ({
                     .filter(id => !isNaN(id));
                   setRoomData({ ...roomData, projects: ids });
                 }}
+                onClick={(e) => e.stopPropagation()}
+                onMouseDown={(e) => e.stopPropagation()}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 placeholder="Ex: 1, 2, 3"
               />
