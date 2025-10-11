@@ -433,7 +433,7 @@ const NewMap: React.FC = () => {
       />
 
       {/* Canvas do Mapa */}
-      <div className="absolute inset-0 flex flex-col">
+      <div ref={containerRef} className="absolute inset-0 flex flex-col">
         {/* Logo / Botão Sair - Topo Direito */}
         {user ? (
           <button
