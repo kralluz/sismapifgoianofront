@@ -6,6 +6,7 @@ import { api } from "../services/api";
 import type {
   Room,
   CreateRoomRequest,
+  UpdateRoomRequest,
   Project,
   CreateProjectRequest,
   UpdateProjectRequest,
@@ -24,6 +25,7 @@ const NewMap: React.FC = () => {
   const navigate = useNavigate();
   const { user, logout } = useAuth();
   const svgRef = useRef<SVGSVGElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   // Estados principais
   const [rooms, setRooms] = useState<RoomWithProjects[]>([]);
@@ -64,6 +66,32 @@ const NewMap: React.FC = () => {
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const [panAtDragStart, setPanAtDragStart] = useState({ x: 0, y: 0 });
   const [hasDragged, setHasDragged] = useState(false);
+
+  // Ajustar zoom inicial baseado na largura da tela
+  useEffect(() => {
+    const adjustInitialZoom = () => {
+      if (containerRef.current) {
+        const containerWidth = containerRef.current.clientWidth;
+        const containerHeight = containerRef.current.clientHeight;
+        
+        // Calcular zoom para preencher a largura
+        // Assumindo viewBox="0 0 100 100", queremos ajustar para a largura
+        const widthZoom = containerWidth / 100;
+        const heightZoom = containerHeight / 100;
+        
+        // Usar o menor valor para garantir que tudo caiba
+        const initialZoom = Math.min(widthZoom, heightZoom) * 0.95; // 95% para margem
+        
+        setZoom(initialZoom);
+      }
+    };
+
+    // Ajustar no mount e quando redimensionar
+    adjustInitialZoom();
+    window.addEventListener('resize', adjustInitialZoom);
+    
+    return () => window.removeEventListener('resize', adjustInitialZoom);
+  }, []);
 
   // Função para carregar salas (useCallback para evitar re-criação)
   const loadRooms = useCallback(async () => {
@@ -171,13 +199,10 @@ const NewMap: React.FC = () => {
     try {
       const roomData: CreateRoomRequest = {
         name: data.name,
-        description: data.description || `Sala ${data.name}`,
-        type: data.type,
-        capacity: data.capacity,
-        building: data.building,
         x: position.x,
         y: position.y,
-        path: path,
+        description: data.description || `Sala ${data.name}`,
+        path: path.length > 0 ? path : undefined,
       };
 
       await api.createRoom(roomData);
@@ -207,11 +232,12 @@ const NewMap: React.FC = () => {
   ) => {
     try {
       // Atualizar sala com dados, path e posição
-      const roomData = {
-        ...data,
+      const roomData: UpdateRoomRequest = {
+        name: data.name,
         x: position.x,
         y: position.y,
-        path: path,
+        description: data.description,
+        path: path.length > 0 ? path : undefined,
       };
       
       await api.updateRoom(id.toString(), roomData);
@@ -355,7 +381,7 @@ const NewMap: React.FC = () => {
   };
 
   return (
-    <div className="h-screen w-full bg-gray-100 flex overflow-hidden">
+    <div className="h-screen w-full bg-gray-100 flex overflow-hidden relative">
       {/* Sidebar */}
       <MapSidebar
         rooms={rooms}
@@ -407,7 +433,7 @@ const NewMap: React.FC = () => {
       />
 
       {/* Canvas do Mapa */}
-      <div className="flex-1 flex flex-col relative">
+      <div className="absolute inset-0 flex flex-col">
         {/* Logo / Botão Sair - Topo Direito */}
         {user ? (
           <button
@@ -542,34 +568,6 @@ const NewMap: React.FC = () => {
           </button>
           <div className="bg-white border border-gray-300 rounded-lg px-3 py-2 shadow-md text-xs text-gray-600 text-center">
             {(zoom * 100).toFixed(0)}%
-          </div>
-        </div>
-
-        {/* Info Debug */}
-        <div className="absolute top-6 left-6 z-10 bg-white/90 backdrop-blur border border-gray-300 rounded-lg px-4 py-3 shadow-md text-xs font-mono">
-          <div className="grid grid-cols-2 gap-x-4 gap-y-1">
-            <span className="text-gray-500">Salas:</span>
-            <span className="text-gray-800 font-semibold">{rooms.length}</span>
-            <span className="text-gray-500">Zoom:</span>
-            <span className="text-gray-800 font-semibold">
-              {zoom.toFixed(2)}
-            </span>
-            <span className="text-gray-500">Pan X:</span>
-            <span className="text-gray-800 font-semibold">
-              {pan.x.toFixed(2)}
-            </span>
-            <span className="text-gray-500">Pan Y:</span>
-            <span className="text-gray-800 font-semibold">
-              {pan.y.toFixed(2)}
-            </span>
-            <span className="text-gray-500">Dragging:</span>
-            <span
-              className={
-                isDragging ? "text-green-600 font-semibold" : "text-gray-400"
-              }
-            >
-              {isDragging ? "SIM" : "não"}
-            </span>
           </div>
         </div>
 

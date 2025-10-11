@@ -4,9 +4,6 @@ import { X } from 'lucide-react';
 interface RoomFormData {
   name: string;
   description: string;
-  type: string;
-  capacity: number;
-  building: string;
 }
 
 interface CreateRoomFormProps {
@@ -33,9 +30,6 @@ const CreateRoomForm: React.FC<CreateRoomFormProps> = ({
   const [roomData, setRoomData] = useState<RoomFormData>({
     name: '',
     description: '',
-    type: 'Laboratório',
-    capacity: 30,
-    building: 'Bloco A',
   });
 
   // Iniciar traçado automaticamente quando o componente montar
@@ -129,57 +123,21 @@ const CreateRoomForm: React.FC<CreateRoomFormProps> = ({
         {/* Descrição */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
-            Descrição
+            Descrição *
           </label>
           <textarea
+            required
             value={roomData.description}
             onChange={(e) => setRoomData({ ...roomData, description: e.target.value })}
-            rows={2}
+            rows={3}
+            maxLength={500}
+            style={{ resize: 'none' }}
             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            placeholder="Descrição do local..."
+            placeholder="Descrição do local... (máx. 500 caracteres)"
           />
-        </div>
-
-        {/* Grid de Campos */}
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Tipo
-            </label>
-            <input
-              type="text"
-              value={roomData.type}
-              onChange={(e) => setRoomData({ ...roomData, type: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              placeholder="Ex: Laboratório, Sala de Aula"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Capacidade
-            </label>
-            <input
-              type="number"
-              min={1}
-              value={roomData.capacity}
-              onChange={(e) => setRoomData({ ...roomData, capacity: Number(e.target.value) })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            />
-          </div>
-
-          <div className="col-span-2">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Prédio
-            </label>
-            <input
-              type="text"
-              value={roomData.building}
-              onChange={(e) => setRoomData({ ...roomData, building: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              placeholder="Ex: Bloco A, Campus 2"
-            />
-          </div>
+          <p className="text-xs text-gray-500 mt-1">
+            {roomData.description.length}/500 caracteres
+          </p>
         </div>
       </div>
 
@@ -195,7 +153,7 @@ const CreateRoomForm: React.FC<CreateRoomFormProps> = ({
 
         <button
           type="submit"
-          disabled={!roomData.name.trim() || tracedPath.length < 2 || isSubmitting}
+          disabled={!roomData.name.trim() || !roomData.description.trim() || tracedPath.length < 2 || isSubmitting}
           className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-blue-400 disabled:cursor-not-allowed transition-colors font-medium"
         >
           {isSubmitting ? 'Criando...' : 'Criar Sala'}

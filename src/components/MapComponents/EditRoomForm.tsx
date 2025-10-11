@@ -5,11 +5,6 @@ import type { Room } from '../../types';
 interface RoomFormData {
   name: string;
   description: string;
-  type: string;
-  capacity: number;
-  building: string;
-  floor: number;
-  amenities: string[];
 }
 
 interface EditRoomFormProps {
@@ -38,14 +33,7 @@ const EditRoomForm: React.FC<EditRoomFormProps> = ({
   const [roomData, setRoomData] = useState<RoomFormData>({
     name: room.name,
     description: room.description,
-    type: room.type,
-    capacity: room.capacity,
-    building: room.building,
-    floor: room.floor,
-    amenities: room.amenities || [],
   });
-
-  const [amenityInput, setAmenityInput] = useState('');
 
   // Iniciar traçado automaticamente quando o componente montar
   useEffect(() => {
@@ -80,23 +68,6 @@ const EditRoomForm: React.FC<EditRoomFormProps> = ({
     } finally {
       setIsSubmitting(false);
     }
-  };
-
-  const addAmenity = () => {
-    if (amenityInput.trim() && !roomData.amenities.includes(amenityInput.trim())) {
-      setRoomData({
-        ...roomData,
-        amenities: [...roomData.amenities, amenityInput.trim()],
-      });
-      setAmenityInput('');
-    }
-  };
-
-  const removeAmenity = (amenity: string) => {
-    setRoomData({
-      ...roomData,
-      amenities: roomData.amenities.filter((a) => a !== amenity),
-    });
   };
 
   // Determina quantos pontos usar para validação
@@ -172,124 +143,21 @@ const EditRoomForm: React.FC<EditRoomFormProps> = ({
         {/* Descrição */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
-            Descrição
+            Descrição *
           </label>
           <textarea
+            required
             value={roomData.description}
             onChange={(e) => setRoomData({ ...roomData, description: e.target.value })}
-            rows={2}
+            rows={3}
+            maxLength={500}
+            style={{ resize: 'none' }}
             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
-            placeholder="Descrição do local..."
+            placeholder="Descrição do local... (máx. 500 caracteres)"
           />
-        </div>
-
-        {/* Grid de Campos */}
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Tipo
-            </label>
-            <select
-              value={roomData.type}
-              onChange={(e) => setRoomData({ ...roomData, type: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
-            >
-              <option value="classroom">Sala de Aula</option>
-              <option value="lab">Laboratório</option>
-              <option value="library">Biblioteca</option>
-              <option value="auditorium">Auditório</option>
-              <option value="restaurant">Restaurante</option>
-              <option value="office">Escritório</option>
-            </select>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Capacidade *
-            </label>
-            <input
-              type="number"
-              required
-              min={1}
-              value={roomData.capacity}
-              onChange={(e) => setRoomData({ ...roomData, capacity: Number(e.target.value) })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Prédio *
-            </label>
-            <input
-              type="text"
-              required
-              value={roomData.building}
-              onChange={(e) => setRoomData({ ...roomData, building: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
-              placeholder="Ex: Bloco A"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Andar *
-            </label>
-            <input
-              type="number"
-              required
-              min={0}
-              value={roomData.floor}
-              onChange={(e) => setRoomData({ ...roomData, floor: Number(e.target.value) })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
-            />
-          </div>
-        </div>
-
-        {/* Recursos/Amenities */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Recursos Disponíveis
-          </label>
-          <div className="flex gap-2 mb-2">
-            <input
-              type="text"
-              value={amenityInput}
-              onChange={(e) => setAmenityInput(e.target.value)}
-              onKeyPress={(e) => {
-                if (e.key === 'Enter') {
-                  e.preventDefault();
-                  addAmenity();
-                }
-              }}
-              className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
-              placeholder="Digite um recurso e pressione Enter"
-            />
-            <button
-              type="button"
-              onClick={addAmenity}
-              className="px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors"
-            >
-              Adicionar
-            </button>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {roomData.amenities.map((amenity, index) => (
-              <span
-                key={index}
-                className="inline-flex items-center gap-1 px-3 py-1 bg-orange-100 text-orange-800 rounded-full text-sm"
-              >
-                {amenity}
-                <button
-                  type="button"
-                  onClick={() => removeAmenity(amenity)}
-                  className="ml-1 text-orange-600 hover:text-orange-800"
-                >
-                  <X className="w-3 h-3" />
-                </button>
-              </span>
-            ))}
-          </div>
+          <p className="text-xs text-gray-500 mt-1">
+            {roomData.description.length}/500 caracteres
+          </p>
         </div>
       </div>
 
@@ -305,7 +173,7 @@ const EditRoomForm: React.FC<EditRoomFormProps> = ({
 
         <button
           type="submit"
-          disabled={!roomData.name.trim() || !hasValidPath || isSubmitting}
+          disabled={!roomData.name.trim() || !roomData.description.trim() || !hasValidPath || isSubmitting}
           className="flex-1 px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 disabled:bg-orange-400 disabled:cursor-not-allowed transition-colors font-medium"
         >
           {isSubmitting ? 'Salvando...' : 'Salvar Alterações'}

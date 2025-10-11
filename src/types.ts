@@ -115,16 +115,11 @@ export interface AuthContextType {
 
 // Tipos para Rooms
 export interface CreateRoomRequest {
-  name: string;
-  x: number;
-  y: number;
-  description: string;
-  capacity: number;
-  type: string;
-  building: string;
-  floor?: number;
-  amenities?: string[];
-  path?: number[][];
+  name: string;        // obrigatório (2-100 chars)
+  x: number;          // obrigatório
+  y: number;          // obrigatório
+  description: string; // obrigatório (max 500 chars)
+  path?: number[][];   // opcional (array de pontos [x,y])
 }
 
 export interface UpdateRoomRequest extends Partial<CreateRoomRequest> {}

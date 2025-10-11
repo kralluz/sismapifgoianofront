@@ -10,56 +10,7 @@ import type {
   UpdateProjectRequest,
 } from "../types";
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
-
-// Fallback data for development when API is not available
-const FALLBACK_ROOMS = [
-  {
-    id: 1,
-    name: "Entrada Principal",
-    x: 20,
-    y: 80,
-    description: "Portão de entrada do campus",
-    type: "office",
-    capacity: 50,
-    floor: 1,
-    building: "Campus Principal",
-    amenities: ["Wi-Fi", "Acessibilidade"],
-    path: [[15, 85], [20, 80]],
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString()
-  },
-  {
-    id: 2,
-    name: "Biblioteca Central",
-    x: 50,
-    y: 30,
-    description: "Biblioteca principal do campus",
-    type: "library",
-    capacity: 200,
-    floor: 1,
-    building: "Campus Principal",
-    amenities: ["Wi-Fi", "Ar condicionado", "Computadores"],
-    path: [[20, 80], [35, 55], [50, 30]],
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString()
-  },
-  {
-    id: 3,
-    name: "Laboratório de Informática",
-    x: 75,
-    y: 45,
-    description: "Lab com 40 computadores",
-    type: "lab",
-    capacity: 40,
-    floor: 2,
-    building: "Bloco A",
-    amenities: ["Computadores", "Projetor", "Ar condicionado"],
-    path: [[50, 30], [65, 38], [75, 45]],
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString()
-  }
-];
+const API_BASE_URL = "https://api-sismap-api.i5mfns.easypanel.host";
 
 const getAuthHeaders = () => {
   const token = localStorage.getItem("authToken");
@@ -151,16 +102,11 @@ export const api = {
   },
 
   getRooms: async (): Promise<Room[]> => {
-    try {
-      const response = await fetch(`${API_BASE_URL}/api/room`, {
-        headers: getAuthHeadersNoContentType(),
-      });
-      if (!response.ok) throw new Error("Erro ao buscar salas");
-      return response.json();
-    } catch (error) {
-      console.warn('API not available, using fallback data:', error);
-      return FALLBACK_ROOMS as Room[];
-    }
+    const response = await fetch(`${API_BASE_URL}/api/room`, {
+      headers: getAuthHeadersNoContentType(),
+    });
+    if (!response.ok) throw new Error("Erro ao buscar salas");
+    return response.json();
   },
 
   getRoom: async (id: string): Promise<Room> => {

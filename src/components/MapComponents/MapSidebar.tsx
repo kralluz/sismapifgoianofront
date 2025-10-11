@@ -120,25 +120,23 @@ const MapSidebar: React.FC<MapSidebarProps> = ({
 
   if (sidebarMinimized) {
     return (
-      <div className="bg-white shadow-2xl flex flex-col flex-shrink-0 z-20 w-16 border-r border-gray-100 transition-all duration-300 ease-in-out animate-in slide-in-from-left">
-        <button
-          onClick={() => setSidebarMinimized(false)}
-          className="p-4 hover:bg-gray-50 transition-colors group"
-          title="Expandir menu"
-        >
-          <ChevronRight className="w-6 h-6 text-gray-600 group-hover:translate-x-1 transition-transform" />
-        </button>
-      </div>
+      <button
+        onClick={() => setSidebarMinimized(false)}
+        className="absolute left-0 top-4 z-20 bg-white shadow-lg border border-gray-200 rounded-r-lg p-3 hover:bg-gray-50 transition-all hover:pr-4 group"
+        title="Expandir menu"
+      >
+        <ChevronRight className="w-5 h-5 text-gray-600 group-hover:text-blue-600 transition-colors" />
+      </button>
     );
   }
 
   return (
-    <div className="bg-white shadow-2xl flex flex-col flex-shrink-0 z-20 w-80 lg:w-96 border-r border-gray-100 transition-all duration-300 ease-in-out animate-in slide-in-from-left">
+    <div className="absolute left-0 top-0 bottom-0 bg-white shadow-2xl flex flex-col flex-shrink-0 z-20 w-80 lg:w-96 border-r border-gray-100 transition-all duration-300 ease-in-out animate-in slide-in-from-left">
       {/* Modern Header */}
       <div className="p-6 border-b border-gray-100 animate-in fade-in slide-in-from-top duration-500">
         <div className="flex items-center justify-between mb-4">
           <div className="animate-in fade-in slide-in-from-left duration-700">
-            <h1 className="text-2xl font-bold text-gray-900">Mapa IF</h1>
+            <h1 className="text-2xl font-bold text-gray-900">Mapa IF- Campus Ceres</h1>
             <p className="text-sm text-gray-500 mt-0.5">
               {activeTab === 'projetos' ? `${totalProjects} projetos` : `${rooms.length} salas`}
             </p>
@@ -216,7 +214,13 @@ const MapSidebar: React.FC<MapSidebarProps> = ({
           <div className="flex gap-2 mt-3">
             {activeTab === 'projetos' && (
               <button
-                onClick={() => setShowCreateProjectModal(true)}
+                onClick={() => {
+                  if (rooms.length === 0) {
+                    alert('Você precisa criar pelo menos uma sala antes de criar um projeto.');
+                  } else {
+                    setShowCreateProjectModal(true);
+                  }
+                }}
                 className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-xl hover:from-purple-700 hover:to-pink-700 transition-all shadow-sm hover:shadow-md font-medium text-sm"
               >
                 <Plus className="w-4 h-4" />
@@ -476,7 +480,7 @@ const MapSidebar: React.FC<MapSidebarProps> = ({
       )}
 
       {/* Modal de Criar Projeto */}
-      {showCreateProjectModal && rooms.length > 0 && (
+      {showCreateProjectModal && (
         <ProjectForm
           rooms={rooms}
           onSubmit={async (projectData) => {
