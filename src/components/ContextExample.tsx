@@ -34,9 +34,6 @@ const ExampleUsage: React.FC = () => {
         x: 100,
         y: 200,
         description: "Sala para reuniões pequenas",
-        capacity: 10,
-        type: "classroom",
-        building: "Bloco A",
       });
     } catch (error) {}
   };

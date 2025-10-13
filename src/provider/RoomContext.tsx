@@ -68,10 +68,6 @@ export const RoomProvider: React.FC<RoomProviderProps> = ({ children }) => {
         throw new Error('Nome da sala deve ter pelo menos 2 caracteres');
       }
       
-      if (roomData.capacity < 1) {
-        throw new Error('Capacidade deve ser pelo menos 1');
-      }
-      
       if (roomData.x < 0 || roomData.y < 0) {
         throw new Error('Coordenadas devem ser positivas');
       }

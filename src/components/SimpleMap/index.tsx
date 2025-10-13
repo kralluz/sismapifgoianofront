@@ -140,13 +140,8 @@ const SimpleMap: React.FC = () => {
       const roomData: CreateRoomRequest = {
         name: data.name,
         description: data.description || `Sala ${data.name}`,
-        type: data.type,
-        capacity: data.capacity,
-        floor: data.floor,
-        building: data.building,
         x: position.x,
         y: position.y,
-        amenities: [],
         path: path
       };
 

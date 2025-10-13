@@ -354,7 +354,9 @@ export const api = {
   },
 
   healthCheck: async () => {
-    const response = await fetch(`${API_BASE_URL}/health`);
+    const response = await fetch(`${API_BASE_URL}/health`, {
+      headers: getAuthHeadersNoContentType(),
+    });
     if (!response.ok) throw new Error("Erro ao verificar saúde da API");
     return response.json();
   },
