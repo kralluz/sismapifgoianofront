@@ -125,7 +125,7 @@ const InteractiveMapSVG: React.FC<InteractiveMapSVGProps> = ({
             ? 'cursor-grabbing'
             : 'cursor-grab'
         }`}
-        viewBox="0 0 100 100"
+        viewBox="0 0 100 141"
         preserveAspectRatio="xMidYMid meet"
         onClick={(e) => {
           // Only trigger if click is directly on SVG background or image
@@ -150,12 +150,12 @@ const InteractiveMapSVG: React.FC<InteractiveMapSVGProps> = ({
       >
         {/* Imagem do mapa como fundo */}
         <image
-          href="/mapa/mapa.png"
+          href="/mapa/mapa.jpg"
           x="0"
           y="0"
           width="100"
-          height="100"
-          preserveAspectRatio="xMidYMid slice"
+          height="141"
+          preserveAspectRatio="xMidYMid meet"
         />
 
         {/* Caminho temporário durante criação */}

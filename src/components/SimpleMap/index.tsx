@@ -4,6 +4,7 @@ import type { Room, CreateRoomRequest, Project, CreateProjectRequest, UpdateProj
 import MapSidebar from './MapSidebar';
 import MapCanvas from '../MapComponents/MapCanvas';
 import RoomDetailsModal from '../MapComponents/RoomDetailsModal';
+import RoomDetailsFullModal from '../MapComponents/RoomDetailsFullModal';
 import ProjectForm from './ProjectForm';
 import EditProjectModal from '../MapComponents/EditProjectModal';
 
@@ -22,6 +23,8 @@ const SimpleMap: React.FC = () => {
   // Estados de modais
   const [showRoomDetails, setShowRoomDetails] = useState(false);
   const [selectedRoom, setSelectedRoom] = useState<Room | null>(null);
+  const [showRoomFullDetails, setShowRoomFullDetails] = useState(false);
+  const [roomForFullDetails, setRoomForFullDetails] = useState<RoomWithProjects | null>(null);
   const [showProjectForm, setShowProjectForm] = useState(false);
   const [projectFormRoomId, setProjectFormRoomId] = useState<number | null>(null);
   const [showEditProjectModal, setShowEditProjectModal] = useState(false);
@@ -129,6 +132,15 @@ const SimpleMap: React.FC = () => {
     e.stopPropagation();
     setSelectedRoom(room);
     setShowRoomDetails(true);
+  };
+
+  const handleRoomViewDetails = (room: Room) => {
+    // Encontrar a sala com projetos
+    const roomWithProjects = rooms.find(r => r.id === room.id);
+    if (roomWithProjects) {
+      setRoomForFullDetails(roomWithProjects);
+      setShowRoomFullDetails(true);
+    }
   };
 
   const handleCreateRoom = async (
@@ -293,8 +305,9 @@ const SimpleMap: React.FC = () => {
         setSidebarMinimized={setSidebarMinimized}
         onRoomSelect={(room) => {
           setSelectedRoom(room);
-          setShowRoomDetails(true);
+          // Não abrir modal aqui - apenas mostrar caminho no mapa
         }}
+        onRoomViewDetails={handleRoomViewDetails}
         onRoomEdit={(room) => {
           // TODO: Implementar edição
           console.log('Editar sala:', room);
@@ -356,6 +369,14 @@ const SimpleMap: React.FC = () => {
         <RoomDetailsModal
           room={selectedRoom}
           onClose={() => setShowRoomDetails(false)}
+        />
+      )}
+
+      {/* Modal de Detalhes Completos da Sala */}
+      {showRoomFullDetails && roomForFullDetails && (
+        <RoomDetailsFullModal
+          room={roomForFullDetails}
+          onClose={() => setShowRoomFullDetails(false)}
         />
       )}
 

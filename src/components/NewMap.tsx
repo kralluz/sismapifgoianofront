@@ -600,7 +600,7 @@ const NewMap: React.FC = () => {
           >
             {/* Imagem do mapa como fundo */}
             <image
-              href="/mapa/mapa.jpeg"
+              href="/mapa/mapa.jpg"
               x="0"
               y="0"
               width="100"

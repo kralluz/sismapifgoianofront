@@ -54,7 +54,7 @@ const MapCanvas: React.FC<MapCanvasProps> = ({
   onCloseError,
 }) => {
   return (
-    <div className="flex-1 relative h-full w-full overflow-hidden">
+    <div className="flex-1 relative h-screen w-full overflow-hidden">
       {/* Mensagens de Notificação */}
       {successMessage && (
         <div className="absolute top-4 right-4 bg-green-500 text-white px-4 py-3 rounded-lg shadow-lg z-50 flex items-center gap-2">
@@ -115,12 +115,12 @@ const MapCanvas: React.FC<MapCanvasProps> = ({
 
       {/* SVG Canvas */}
       <svg
-        className={`absolute inset-0 w-full h-full border border-gray-300 rounded-lg shadow-lg bg-white ${
+        className={`w-full h-full bg-gray-50 ${
           isDragging ? 'cursor-grabbing' : 
           isTracingPath || waitingForClick ? 'cursor-crosshair' : 'cursor-grab'
         }`}
         viewBox="0 0 100 100"
-        preserveAspectRatio="xMidYMid meet"
+        preserveAspectRatio="xMidYMid slice"
         onClick={onMapClick}
         onMouseDown={onMouseDown}
         onMouseMove={onMouseMove}
@@ -134,12 +134,12 @@ const MapCanvas: React.FC<MapCanvasProps> = ({
         <g transform={`translate(${pan.x}, ${pan.y}) scale(${zoom})`}>
           {/* Imagem do mapa como fundo */}
           <image
-            href="/mapa/mapa.jpeg"
+            href="/mapa/mapa.jpg"
             x="0"
             y="0"
             width="100"
             height="100"
-            preserveAspectRatio="xMidYMid slice"
+            preserveAspectRatio="xMidYMid meet"
           />
 
           {/* Renderizar caminhos e pontos existentes */}

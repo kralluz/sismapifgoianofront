@@ -16,6 +16,7 @@ interface MapSidebarProps {
   onRoomSelect: (room: Room) => void;
   onRoomEdit: (room: Room) => void;
   onRoomDelete: (room: Room) => void;
+  onRoomViewDetails: (room: Room) => void;
   onProjectCreate: (roomId?: number) => void;
   onProjectEdit: (project: Project) => void;
   onProjectDelete: (project: Project) => void;
@@ -36,6 +37,7 @@ const MapSidebar: React.FC<MapSidebarProps> = ({
   onRoomSelect,
   onRoomEdit,
   onRoomDelete,
+  onRoomViewDetails,
   onProjectCreate,
   onProjectEdit,
   onProjectDelete,
@@ -153,6 +155,7 @@ const MapSidebar: React.FC<MapSidebarProps> = ({
                   onRoomSelect={onRoomSelect}
                   onRoomEdit={onRoomEdit}
                   onRoomDelete={onRoomDelete}
+                  onRoomViewDetails={onRoomViewDetails}
                   onProjectCreate={onProjectCreate}
                   onProjectEdit={onProjectEdit}
                   onProjectDelete={onProjectDelete}

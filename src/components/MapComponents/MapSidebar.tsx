@@ -131,7 +131,7 @@ const MapSidebar: React.FC<MapSidebarProps> = ({
   }
 
   return (
-    <div className="absolute left-0 top-0 bottom-0 bg-white shadow-2xl flex flex-col flex-shrink-0 z-20 w-80 lg:w-96 border-r border-gray-100 transition-all duration-300 ease-in-out animate-in slide-in-from-left">
+    <div className="relative bg-white shadow-2xl flex flex-col flex-shrink-0 z-20 w-80 lg:w-96 border-r border-gray-100 transition-all duration-300 ease-in-out animate-in slide-in-from-left h-screen">
       {/* Modern Header */}
       <div className="p-6 border-b border-gray-100 animate-in fade-in slide-in-from-top duration-500">
         <div className="flex items-center justify-between mb-4">

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import type { Room, Project } from '../../types';
-import { ChevronDown, ChevronRight, Folder, Plus, Edit, Trash2, MapPin } from 'lucide-react';
+import { ChevronDown, ChevronRight, Folder, Plus, Edit, Trash2, MapPin, Eye } from 'lucide-react';
 import { useAuth } from '../../provider/AuthContext';
 
 interface RoomWithProjects extends Room {
@@ -16,6 +16,7 @@ interface RoomListViewProps {
   onProjectCreate: (roomId: number) => void;
   onProjectEdit: (project: Project) => void;
   onProjectDelete: (project: Project) => void;
+  onRoomViewDetails: (room: Room) => void;
 }
 
 const RoomListView: React.FC<RoomListViewProps> = ({
@@ -27,6 +28,7 @@ const RoomListView: React.FC<RoomListViewProps> = ({
   onProjectCreate,
   onProjectEdit,
   onProjectDelete,
+  onRoomViewDetails,
 }) => {
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin';
@@ -90,6 +92,7 @@ const RoomListView: React.FC<RoomListViewProps> = ({
                         <h3
                           onClick={() => onRoomSelect(room)}
                           className="font-semibold text-gray-900 hover:text-blue-600 cursor-pointer truncate"
+                          title="Clique para exibir rota no mapa"
                         >
                           {room.name}
                         </h3>
@@ -114,31 +117,46 @@ const RoomListView: React.FC<RoomListViewProps> = ({
                   </div>
                 </div>
 
-                {/* Room Actions - Apenas para Admins */}
-                {isAdmin && (
-                  <div className="flex items-center gap-1 ml-2">
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onRoomEdit(room);
-                      }}
-                      className="p-1.5 text-blue-600 hover:bg-blue-50 rounded transition-colors"
-                      title="Editar sala"
-                    >
-                      <Edit className="w-4 h-4" />
-                    </button>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onRoomDelete(room);
-                      }}
-                      className="p-1.5 text-red-600 hover:bg-red-50 rounded transition-colors"
-                      title="Excluir sala"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
-                )}
+                {/* Room Actions */}
+                <div className="flex items-center gap-1 ml-2">
+                  {/* Botão Ver Detalhes - Disponível para todos */}
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onRoomViewDetails(room);
+                    }}
+                    className="p-1.5 text-purple-600 hover:bg-purple-50 rounded transition-colors"
+                    title="Ver detalhes completos"
+                  >
+                    <Eye className="w-4 h-4" />
+                  </button>
+                  
+                  {/* Botões Admin */}
+                  {isAdmin && (
+                    <>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onRoomEdit(room);
+                        }}
+                        className="p-1.5 text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                        title="Editar sala"
+                      >
+                        <Edit className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onRoomDelete(room);
+                        }}
+                        className="p-1.5 text-red-600 hover:bg-red-50 rounded transition-colors"
+                        title="Excluir sala"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </>
+                  )}
+                </div>
               </div>
             </div>
 

@@ -294,9 +294,9 @@ const SimpleMap: React.FC = () => {
   };
 
   return (
-    <div className="h-screen w-full bg-gray-100 flex overflow-hidden">
+    <div className="h-screen w-full bg-gray-100 flex flex-row overflow-hidden">
       {/* Sidebar */}
-      <MapSidebar
+      {!sidebarMinimized && <MapSidebar
         rooms={rooms}
         loading={loading}
         sidebarMinimized={sidebarMinimized}
@@ -328,10 +328,10 @@ const SimpleMap: React.FC = () => {
         tracedPath={tracedPath}
         roomPosition={tempRoomPosition}
         onCreateRoom={handleCreateRoom}
-      />
+      />}
 
       {/* Canvas do Mapa */}
-      <div className="flex-1 flex flex-col">
+      <div className="flex-1 flex flex-col relative">
         <MapCanvas
           rooms={rooms}
           loading={loading}
