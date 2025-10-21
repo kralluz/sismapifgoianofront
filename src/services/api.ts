@@ -10,7 +10,8 @@ import type {
   UpdateProjectRequest,
 } from "../types";
 
-const API_BASE_URL = "https://api-sismap-api.i5mfns.easypanel.host";
+const API_BASE_URL = "http://localhost:3000";
+// const API_BASE_URL = "https://api-sismap-api.i5mfns.easypanel.host";
 
 const getAuthHeaders = () => {
   const token = localStorage.getItem("authToken");

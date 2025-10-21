@@ -633,72 +633,94 @@ const NewMap: React.FC = () => {
             </g>
 
             {/* Renderizar salas da API */}
-            {rooms.map((room) => (
-              <g key={room.id}>
-                {/* Renderizar caminho apenas se um projeto dessa sala estiver selecionado */}
-                {room.path && room.path.length > 0 && selectedProjectId && room.projects?.some(p => p.id === selectedProjectId) && (
-                  <g>
-                    {/* Linha do caminho */}
-                    <polyline
-                      points={room.path
-                        .map((point) => `${point[0]},${point[1]}`)
-                        .join(" ")}
-                      fill="none"
-                      stroke="#10B981"
-                      strokeWidth={0.4 / zoom}
-                      strokeDasharray={`${0.8 / zoom} ${0.8 / zoom}`}
-                      className="opacity-70"
-                    />
-                    {/* Pontos intermediários do caminho */}
-                    {room.path.slice(0, -1).map((point, index) => (
-                      <circle
-                        key={`path-${room.id}-${index}`}
-                        cx={point[0]}
-                        cy={point[1]}
-                        r={0.5 / zoom}
-                        fill="#10B981"
-                        className="opacity-60"
+            {rooms.map((room) => {
+              // Verificar se deve mostrar esta sala
+              const shouldShowRoom = user || (selectedProjectId && room.projects?.some(p => p.id === selectedProjectId));
+              const isSelectedProjectRoom = selectedProjectId && room.projects?.some(p => p.id === selectedProjectId);
+              
+              return (
+                <g key={room.id}>
+                  {/* Renderizar caminho apenas se um projeto dessa sala estiver selecionado */}
+                  {room.path && room.path.length > 0 && isSelectedProjectRoom && (
+                    <g>
+                      {/* Linha do caminho (destacar em vermelho) */}
+                      <polyline
+                        points={room.path
+                          .map((point) => `${point[0]},${point[1]}`)
+                          .join(" ")}
+                        fill="none"
+                        stroke="#ef4444"
+                        strokeWidth={0.7 / zoom}
+                        strokeDasharray={`${1.2 / zoom} ${1.2 / zoom}`}
+                        className="opacity-95"
+                        style={{
+                          filter: 'drop-shadow(0 2px 6px rgba(239,68,68,0.35))'
+                        }}
                       />
-                    ))}
-                  </g>
-                )}
-                {/* Círculo do ponto de destino */}
-                <circle
-                  cx={room.x}
-                  cy={room.y}
-                  r={0.8 / zoom}
-                  fill="#3B82F6"
-                  stroke="#1E40AF"
-                  strokeWidth={0.15 / zoom}
-                  className="hover:fill-blue-700 transition-colors cursor-pointer"
-                  onClick={(e) => handleRoomClick(room, e)}
-                />
-                {/* Label do ponto com borda branca para melhor legibilidade */}
-                <text
-                  x={room.x}
-                  y={room.y - 2.2}
-                  textAnchor="middle"
-                  className="pointer-events-none"
-                  fontSize={`${1.8 / zoom}px`}
-                  style={{
-                    fontSize: `${1.8 / zoom}px`,
-                    fontFamily: "Arial, sans-serif",
-                    fontWeight: "600",
-                    fill: "#1F2937",
-                    stroke: "#FFFFFF",
-                    strokeWidth: `${0.5 / zoom}px`,
-                    paintOrder: "stroke fill",
-                  }}
-                >
-                  {room.name}
-                </text>
-                {/* Informações adicionais em hover */}
-                <title>
-                  {room.name} - {room.description}
-                  {room.path && ` (Caminho com ${room.path.length} pontos)`}
-                </title>
-              </g>
-            ))}
+                      {/* Pontos intermediários do caminho (vermelho) */}
+                      {room.path.slice(0, -1).map((point, index) => (
+                        <circle
+                          key={`path-${room.id}-${index}`}
+                          cx={point[0]}
+                          cy={point[1]}
+                          r={0.8 / zoom}
+                          fill="#ef4444"
+                          stroke="#b91c1c"
+                          strokeWidth={0.22 / zoom}
+                          className="opacity-95"
+                        />
+                      ))}
+                    </g>
+                  )}
+                  
+                  {/* Renderizar ponto apenas se deve ser mostrado */}
+                  {shouldShowRoom && (
+                    <>
+                      {/* Círculo do ponto de destino */}
+                      <circle
+                        cx={room.x}
+                        cy={room.y}
+                        r={(isSelectedProjectRoom ? 1.2 : 0.8) / zoom}
+                        fill={isSelectedProjectRoom ? "#ef4444" : "#3B82F6"}
+                        stroke={isSelectedProjectRoom ? "#b91c1c" : "#1E40AF"}
+                        strokeWidth={0.2 / zoom}
+                        className="hover:fill-blue-700 transition-all cursor-pointer"
+                        style={{
+                          filter: isSelectedProjectRoom 
+                            ? 'drop-shadow(0 0 8px rgba(239, 68, 68, 0.6))' 
+                            : 'none'
+                        }}
+                        onClick={(e) => handleRoomClick(room, e)}
+                      />
+                      {/* Label do ponto com borda branca para melhor legibilidade */}
+                      <text
+                        x={room.x}
+                        y={room.y - (isSelectedProjectRoom ? 2.8 : 2.2)}
+                        textAnchor="middle"
+                        className="pointer-events-none"
+                        fontSize={`${(isSelectedProjectRoom ? 2.2 : 1.8) / zoom}px`}
+                        style={{
+                          fontSize: `${(isSelectedProjectRoom ? 2.2 : 1.8) / zoom}px`,
+                          fontFamily: "Arial, sans-serif",
+                          fontWeight: isSelectedProjectRoom ? "700" : "600",
+                          fill: isSelectedProjectRoom ? "#b91c1c" : "#1F2937",
+                          stroke: "#FFFFFF",
+                          strokeWidth: `${0.6 / zoom}px`,
+                          paintOrder: "stroke fill",
+                        }}
+                      >
+                        {room.name}
+                      </text>
+                      {/* Informações adicionais em hover */}
+                      <title>
+                        {room.name} - {room.description}
+                        {room.path && ` (Caminho com ${room.path.length} pontos)`}
+                      </title>
+                    </>
+                  )}
+                </g>
+              );
+            })}
 
             {/* Renderizar caminho sendo traçado manualmente */}
             {isTracingPath && tracedPath.length > 0 && (
@@ -850,9 +872,19 @@ const NewMap: React.FC = () => {
       {showRoomDetails && selectedRoom && (
         <RoomDetailsModal
           room={selectedRoom}
-          onClose={() => setShowRoomDetails(false)}
+          onClose={() => {
+            setShowRoomDetails(false);
+            // Recarregar salas para atualizar projetos
+            loadRooms();
+          }}
           onEdit={user ? handleEditRoom : undefined}
           onDelete={user ? handleDeleteRoom : undefined}
+          onProjectCreate={user ? handleCreateProject : undefined}
+          onProjectEdit={user ? (project) => {
+            setProjectToEdit(project);
+            setShowEditProjectModal(true);
+          } : undefined}
+          onProjectDelete={user ? handleDeleteProject : undefined}
           isLoggedIn={!!user}
         />
       )}

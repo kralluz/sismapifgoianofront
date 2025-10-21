@@ -110,12 +110,31 @@ const MapSidebar: React.FC<MapSidebarProps> = ({
 
   const totalProjects = allProjects.length;
 
+  const [showProjectDetails, setShowProjectDetails] = useState(false);
+  const [detailedProject, setDetailedProject] = useState<(Project & { room: Room }) | null>(null);
+
   const handleProjectClick = (project: Project & { room: Room }) => {
-    setSelectedProject(project);
-    // Notifica o componente pai sobre a seleção do projeto
-    if (onProjectSelect) {
-      onProjectSelect(project.id, project.room);
+    // Se clicar no projeto já selecionado, desmarcar
+    if (selectedProject?.id === project.id) {
+      setSelectedProject(null);
+      if (onProjectSelect) {
+        onProjectSelect(null, null);
+      }
+    } else {
+      setSelectedProject(project);
+      // Notifica o componente pai sobre a seleção do projeto
+      if (onProjectSelect) {
+        onProjectSelect(project.id, project.room);
+      }
+      // Mostrar detalhes do projeto
+      setDetailedProject(project);
+      setShowProjectDetails(true);
     }
+  };
+
+  const handleBackFromDetails = () => {
+    setShowProjectDetails(false);
+    setDetailedProject(null);
   };
 
   if (sidebarMinimized) {
@@ -208,6 +227,15 @@ const MapSidebar: React.FC<MapSidebarProps> = ({
             />
           </div>
         )}
+        
+        {/* Aviso para usuários deslogados */}
+        {!showCreateWizard && !isLoggedIn && activeTab === 'projetos' && (
+          <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg animate-in fade-in slide-in-from-top duration-500 delay-200">
+            <p className="text-xs text-blue-700 text-center">
+              💡 Clique em um projeto para visualizar sua localização no mapa
+            </p>
+          </div>
+        )}
 
         {/* User Actions - Criar Projeto/Sala */}
         {!showCreateWizard && isLoggedIn && (
@@ -242,7 +270,121 @@ const MapSidebar: React.FC<MapSidebarProps> = ({
 
       {/* Content */}
       <div className="flex-1 overflow-y-auto">
-        {showEditRoomForm && roomToEdit && onUpdateRoom && onCancelEditRoom ? (
+        {showProjectDetails && detailedProject ? (
+          <div className="p-6 animate-in fade-in slide-in-from-right duration-500">
+            {/* Cabeçalho com botão voltar */}
+            <button
+              onClick={handleBackFromDetails}
+              className="flex items-center gap-2 text-blue-600 hover:text-blue-700 mb-4 transition-colors"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              </svg>
+              <span className="font-medium">Voltar</span>
+            </button>
+
+            {/* Detalhes do Projeto */}
+            <div className="space-y-4">
+              {/* Badge do Número */}
+              <div className="flex items-center gap-3">
+                <span className="inline-flex items-center px-4 py-2 rounded-lg text-lg font-bold bg-gradient-to-r from-purple-100 to-pink-100 text-purple-700">
+                  #{detailedProject.number}
+                </span>
+              </div>
+
+              {/* Título */}
+              <div>
+                <h3 className="text-2xl font-bold text-gray-900 mb-2">
+                  {detailedProject.title}
+                </h3>
+              </div>
+
+              {/* Localização */}
+              <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                <div className="flex items-center gap-2 mb-1">
+                  <MapPin className="w-5 h-5 text-blue-600" />
+                  <h4 className="font-semibold text-blue-900">Localização</h4>
+                </div>
+                <p className="text-blue-800">{detailedProject.room.name}</p>
+                {detailedProject.room.description && (
+                  <p className="text-sm text-blue-600 mt-1">{detailedProject.room.description}</p>
+                )}
+              </div>
+
+              {/* Data de Criação */}
+              {detailedProject.createdAt && (
+                <div className="p-4 bg-gray-50 border border-gray-200 rounded-lg">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Calendar className="w-5 h-5 text-gray-600" />
+                    <h4 className="font-semibold text-gray-900">Data de Criação</h4>
+                  </div>
+                  <p className="text-gray-700">
+                    {new Date(detailedProject.createdAt).toLocaleDateString('pt-BR', {
+                      day: '2-digit',
+                      month: 'long',
+                      year: 'numeric'
+                    })}
+                  </p>
+                  <p className="text-sm text-gray-500 mt-1">
+                    {new Date(detailedProject.createdAt).toLocaleTimeString('pt-BR', {
+                      hour: '2-digit',
+                      minute: '2-digit'
+                    })}
+                  </p>
+                </div>
+              )}
+
+              {/* Informações da Sala */}
+              <div className="p-4 bg-gradient-to-r from-purple-50 to-pink-50 border border-purple-200 rounded-lg">
+                <h4 className="font-semibold text-purple-900 mb-3">Detalhes da Sala</h4>
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Tipo:</span>
+                    <span className="font-medium text-gray-900">{detailedProject.room.type}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Prédio:</span>
+                    <span className="font-medium text-gray-900">{detailedProject.room.building}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Andar:</span>
+                    <span className="font-medium text-gray-900">{detailedProject.room.floor}°</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Capacidade:</span>
+                    <span className="font-medium text-gray-900">{detailedProject.room.capacity} pessoas</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Botões de Ação para Usuários Logados */}
+              {isLoggedIn && (
+                <div className="flex gap-2 pt-4">
+                  <button
+                    onClick={() => {
+                      onProjectEdit(detailedProject);
+                      setShowProjectDetails(false);
+                    }}
+                    className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors font-medium text-sm"
+                  >
+                    <Edit className="w-4 h-4" />
+                    Editar Projeto
+                  </button>
+                  <button
+                    onClick={() => {
+                      onProjectDelete(detailedProject);
+                      setShowProjectDetails(false);
+                    }}
+                    className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors font-medium text-sm"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                    Excluir
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        ) : showEditRoomForm && roomToEdit && onUpdateRoom && onCancelEditRoom ? (
           <div className="p-6 animate-in fade-in slide-in-from-right duration-500">
             <EditRoomForm
               room={roomToEdit}
