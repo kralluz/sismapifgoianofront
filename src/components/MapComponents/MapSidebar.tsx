@@ -187,21 +187,23 @@ const MapSidebar: React.FC<MapSidebarProps> = ({
             >
               Projetos
             </button>
-            <button
-              onClick={() => {
-                setActiveTab('salas');
-                setSearchQuery('');
-                setSelectedProject(null);
-                if (onProjectSelect) onProjectSelect(null, null);
-              }}
-              className={`flex-1 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                activeTab === 'salas'
-                  ? 'bg-white text-blue-600 shadow-sm'
-                  : 'text-gray-600 hover:text-gray-900'
-              }`}
-            >
-              Salas
-            </button>
+            {isLoggedIn && (
+              <button
+                onClick={() => {
+                  setActiveTab('salas');
+                  setSearchQuery('');
+                  setSelectedProject(null);
+                  if (onProjectSelect) onProjectSelect(null, null);
+                }}
+                className={`flex-1 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                  activeTab === 'salas'
+                    ? 'bg-white text-blue-600 shadow-sm'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                Salas
+              </button>
+            )}
           </div>
         )}
 
