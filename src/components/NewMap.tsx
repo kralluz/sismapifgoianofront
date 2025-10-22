@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
-import { Plus, LogOut } from "lucide-react";
+import { Plus, LogOut, Search, MapPin } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../provider/AuthContext";
 import { api } from "../services/api";
@@ -47,6 +47,31 @@ const NewMap: React.FC = () => {
   const [showEditRoomForm, setShowEditRoomForm] = useState(false);
   const [roomToEdit, setRoomToEdit] = useState<Room | null>(null);
 
+  // Estado para pesquisa flutuante
+  const [floatingSearchQuery, setFloatingSearchQuery] = useState('');
+
+  // Filtrar projetos para pesquisa flutuante
+  const filteredProjects = React.useMemo(() => {
+    if (!floatingSearchQuery.trim()) return [];
+    
+    const query = floatingSearchQuery.toLowerCase();
+    const allProjects: Array<Project & { room: Room }> = [];
+    
+    rooms.forEach(room => {
+      if (room.projects) {
+        room.projects.forEach(project => {
+          allProjects.push({ ...project, room });
+        });
+      }
+    });
+    
+    return allProjects.filter(project => 
+      project.title.toLowerCase().includes(query) ||
+      `#${project.number}`.toLowerCase().includes(query) ||
+      project.room.name.toLowerCase().includes(query)
+    );
+  }, [rooms, floatingSearchQuery]);
+
   // Estados de interação com o mapa
   const [isTracingPath, setIsTracingPath] = useState(false);
   const [tracedPath, setTracedPath] = useState<Array<[number, number]>>([]);
@@ -69,28 +94,11 @@ const NewMap: React.FC = () => {
 
   // Ajustar zoom inicial baseado na largura da tela
   useEffect(() => {
-    const adjustInitialZoom = () => {
-      if (containerRef.current) {
-        const containerWidth = containerRef.current.clientWidth;
-        const containerHeight = containerRef.current.clientHeight;
-        
-        // Calcular zoom para preencher a largura
-        // Assumindo viewBox="0 0 100 100", queremos ajustar para a largura
-        const widthZoom = containerWidth / 100;
-        const heightZoom = containerHeight / 100;
-        
-        // Usar o menor valor para garantir que tudo caiba
-        const initialZoom = Math.min(widthZoom, heightZoom) * 0.95; // 95% para margem
-        
-        setZoom(initialZoom);
-      }
-    };
-
-    // Ajustar no mount e quando redimensionar
-    adjustInitialZoom();
-    window.addEventListener('resize', adjustInitialZoom);
-    
-    return () => window.removeEventListener('resize', adjustInitialZoom);
+    // Iniciar sem zoom automático: força escala 1 e sem pan
+    // Isso evita que o mapa seja escalado automaticamente conforme o container
+    setZoom(1);
+    setPan({ x: 0, y: 0 });
+    // Não adicionar listeners de resize — manter comportamento simples e previsível
   }, []);
 
   // Função para carregar salas (useCallback para evitar re-criação)
@@ -380,18 +388,39 @@ const NewMap: React.FC = () => {
     setPan({ x: 0, y: 0 });
   };
 
+  // Handler para projeto selecionado na pesquisa flutuante
+  const handleFloatingProjectSelect = (project: Project & { room: Room }) => {
+    setSelectedProjectId(project.id);
+    setSelectedRoom(project.room);
+    setFloatingSearchQuery(''); // Limpar pesquisa após seleção
+  };
+
   return (
     <div className="h-screen w-full bg-gray-100 flex overflow-hidden relative">
+      {/* Detalhes decorativos de fundo */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
+        {/* Círculos decorativos superiores */}
+        <div className="absolute top-10 left-20 w-32 h-32 rounded-full bg-[#359830] opacity-5 blur-3xl"></div>
+        <div className="absolute top-32 right-32 w-40 h-40 rounded-full bg-[#359830] opacity-4 blur-2xl"></div>
+        <div className="absolute top-20 left-1/3 w-24 h-24 rounded-full bg-[#359830] opacity-6 blur-xl"></div>
+        
+        {/* Círculos decorativos inferiores */}
+        <div className="absolute bottom-20 left-40 w-36 h-36 rounded-full bg-[#359830] opacity-5 blur-3xl"></div>
+        <div className="absolute bottom-32 right-24 w-28 h-28 rounded-full bg-[#359830] opacity-6 blur-2xl"></div>
+        <div className="absolute bottom-16 left-2/3 w-32 h-32 rounded-full bg-[#359830] opacity-4 blur-xl"></div>
+        
+        {/* Círculos médios espalhados */}
+        <div className="absolute top-1/3 right-16 w-20 h-20 rounded-full bg-[#359830] opacity-5 blur-2xl"></div>
+        <div className="absolute bottom-1/3 left-16 w-24 h-24 rounded-full bg-[#359830] opacity-6 blur-xl"></div>
+        <div className="absolute top-1/2 left-1/4 w-16 h-16 rounded-full bg-[#359830] opacity-4 blur-2xl"></div>
+        <div className="absolute top-2/3 right-1/3 w-28 h-28 rounded-full bg-[#359830] opacity-5 blur-3xl"></div>
+      </div>
       {/* Sidebar */}
       <MapSidebar
         rooms={rooms}
         loading={loading}
         sidebarMinimized={sidebarMinimized}
         setSidebarMinimized={setSidebarMinimized}
-        onRoomSelect={(room) => {
-          setSelectedRoom(room);
-          setShowRoomDetails(true);
-        }}
         onProjectSelect={(projectId, room) => {
           setSelectedProjectId(projectId);
           setSelectedRoom(room);
@@ -441,7 +470,7 @@ const NewMap: React.FC = () => {
               logout();
               navigate("/");
             }}
-            className="absolute top-4 right-4 z-50 flex items-center gap-2 px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg shadow-lg transition-colors"
+            className="absolute top-20 right-4 z-50 flex items-center gap-2 px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg shadow-lg transition-colors"
             title="Sair"
           >
             <LogOut className="w-4 h-4" />
@@ -452,9 +481,68 @@ const NewMap: React.FC = () => {
             src={institutoLogo}
             alt="Logo Instituto"
             onDoubleClick={() => navigate("/login")}
-            className="absolute top-4 right-4 z-50 h-10 w-auto cursor-pointer hover:opacity-80 transition-opacity"
+            className="absolute top-20 right-4 z-50 h-10 w-auto cursor-pointer hover:opacity-80 transition-opacity"
             title="Duplo clique para fazer login"
           />
+        )}
+
+        {/* Barra de Pesquisa Flutuante - Apenas quando sidebar minimizada */}
+        {sidebarMinimized && (
+          <div className="absolute top-4 left-1/2 transform -translate-x-1/2 z-40 animate-in fade-in slide-in-from-top duration-300 w-full max-w-md px-4">
+            <div className="relative">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+                <input
+                  type="text"
+                  placeholder="Buscar projetos..."
+                  value={floatingSearchQuery}
+                  onChange={(e) => setFloatingSearchQuery(e.target.value)}
+                  className="w-full pl-10 pr-4 py-3 bg-white/95 backdrop-blur-sm border border-gray-200 rounded-xl shadow-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all text-sm"
+                />
+              </div>
+              
+              {/* Resultados da pesquisa */}
+              {floatingSearchQuery.trim() && (
+                <div className="absolute top-full left-0 right-0 mt-2 bg-white/95 backdrop-blur-sm border border-gray-200 rounded-xl shadow-xl max-h-80 overflow-y-auto animate-in fade-in slide-in-from-top duration-200">
+                  {filteredProjects.length === 0 ? (
+                    <div className="p-4 text-center text-gray-500 text-sm">
+                      Nenhum projeto encontrado
+                    </div>
+                  ) : (
+                    <div className="py-2">
+                      {filteredProjects.slice(0, 10).map((project) => (
+                        <button
+                          key={project.id}
+                          onClick={() => handleFloatingProjectSelect(project)}
+                          className="w-full px-4 py-3 text-left hover:bg-gray-50 transition-colors border-b border-gray-100 last:border-b-0 group"
+                        >
+                          <div className="flex items-start gap-3">
+                            <span className="inline-flex items-center px-2 py-1 rounded-md text-xs font-bold bg-gradient-to-r from-purple-100 to-pink-100 text-purple-700 flex-shrink-0">
+                              #{project.number}
+                            </span>
+                            <div className="flex-1 min-w-0">
+                              <h4 className="font-medium text-gray-900 text-sm truncate group-hover:text-blue-600 transition-colors">
+                                {project.title}
+                              </h4>
+                              <p className="text-xs text-gray-600 mt-1 flex items-center gap-1">
+                                <MapPin className="w-3 h-3" />
+                                {project.room.name}
+                              </p>
+                            </div>
+                          </div>
+                        </button>
+                      ))}
+                      {filteredProjects.length > 10 && (
+                        <div className="px-4 py-2 text-center text-xs text-gray-500 border-t border-gray-100">
+                          +{filteredProjects.length - 10} resultados
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
         )}
 
         {/* Mensagens de Notificação */}
@@ -607,6 +695,29 @@ const NewMap: React.FC = () => {
               height="100"
               preserveAspectRatio="xMidYMid slice"
             />
+
+            {/* Detalhes decorativos sutis */}
+            <g opacity="0.08">
+              {/* Círculos decorativos no canto superior esquerdo */}
+              <circle cx="5" cy="5" r="3" fill="#359830" />
+              <circle cx="12" cy="3" r="2" fill="#359830" />
+              <circle cx="8" cy="10" r="1.5" fill="#359830" />
+              
+              {/* Círculos decorativos no canto superior direito */}
+              <circle cx="95" cy="6" r="2.5" fill="#359830" />
+              <circle cx="88" cy="4" r="1.8" fill="#359830" />
+              <circle cx="92" cy="12" r="2" fill="#359830" />
+              
+              {/* Círculos decorativos no canto inferior esquerdo */}
+              <circle cx="6" cy="94" r="2.2" fill="#359830" />
+              <circle cx="13" cy="96" r="1.5" fill="#359830" />
+              <circle cx="9" cy="88" r="2.8" fill="#359830" />
+              
+              {/* Círculos decorativos no canto inferior direito */}
+              <circle cx="94" cy="95" r="2" fill="#359830" />
+              <circle cx="87" cy="93" r="1.6" fill="#359830" />
+              <circle cx="91" cy="88" r="2.3" fill="#359830" />
+            </g>
 
             {/* Grid de referência (opcional) */}
             <g opacity="0.2">

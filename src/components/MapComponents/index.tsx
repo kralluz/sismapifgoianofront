@@ -301,9 +301,8 @@ const SimpleMap: React.FC = () => {
         loading={loading}
         sidebarMinimized={sidebarMinimized}
         setSidebarMinimized={setSidebarMinimized}
-        onRoomSelect={(room) => {
-          setSelectedRoom(room);
-          setShowRoomDetails(true);
+        onProjectSelect={(_projectId, _room) => {
+          // TODO: Implementar seleção de projeto
         }}
         onRoomEdit={(_room) => {
           // TODO: Implementar edição

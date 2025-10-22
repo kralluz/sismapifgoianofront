@@ -1,7 +1,12 @@
 {
   "permissions": {
     "allow": [
-      "Bash(echo:*)"
+      "Bash(echo:*)",
+      "Bash(kwriteconfig5:*)",
+      "Bash(qdbus:*)",
+      "Bash(ls:*)",
+      "Read(//home/usuario/.config/**)",
+      "Bash(killall:*)"
     ],
     "deny": [],
     "ask": []
