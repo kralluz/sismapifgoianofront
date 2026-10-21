@@ -1,150 +1,144 @@
-import React, { useState, useEffect, useCallback, useRef } from "react";
-import { Plus, LogOut, Search, MapPin } from "lucide-react";
+import React, { useState, useEffect, useCallback, useRef, useMemo, Suspense, lazy } from "react";
+import { Plus, Minus, RotateCcw, LogOut } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../provider/AuthContext";
 import { api } from "../services/api";
-import type {
-  Room,
-  CreateRoomRequest,
-  UpdateRoomRequest,
-  Project,
-  CreateProjectRequest,
-  UpdateProjectRequest,
-} from "../types";
-import MapSidebar from "./MapComponents/MapSidebar";
-import RoomDetailsModal from "./MapComponents/RoomDetailsModal";
-import ProjectForm from "./MapComponents/ProjectForm";
-import EditProjectModal from "./MapComponents/EditProjectModal";
+import type { Project, CreateProjectRequest } from "../types";
+import { type Local, loadLocais, mapToViewBox, MAP_W, MAP_H } from "../locais";
+import ProjectSidebar from "./ProjectSidebar";
+import LocalPanel from "./LocalPanel";
+import ProjectForm from "./ProjectForm";
 import institutoLogo from "../assets/intitutoLogo.png";
 
-interface RoomWithProjects extends Room {
-  projects?: Project[];
-}
+// three.js só é baixado quando o usuário abre a visão 3D
+const Map3D = lazy(() => import("./Map3D"));
+
+const MIN_ZOOM = 0.5;
+const MAX_ZOOM = 12;
+const FOCUS_ZOOM = 3.5;
 
 const NewMap: React.FC = () => {
   const navigate = useNavigate();
   const { user, logout } = useAuth();
+  const isAdmin = user?.role === "admin";
   const svgRef = useRef<SVGSVGElement>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
 
-  // Estados principais
-  const [rooms, setRooms] = useState<RoomWithProjects[]>([]);
+  // Dados
+  const [locais, setLocais] = useState<Local[]>([]);
+  const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
-  const [sidebarMinimized, setSidebarMinimized] = useState(false);
 
-  // Estados de modais
-  const [showRoomDetails, setShowRoomDetails] = useState(false);
-  const [selectedRoom, setSelectedRoom] = useState<Room | null>(null);
+  // Seleção e formulários
+  const [selectedLocalId, setSelectedLocalId] = useState<string | null>(null);
   const [selectedProjectId, setSelectedProjectId] = useState<number | null>(null);
-  const [showProjectForm, setShowProjectForm] = useState(false);
-  const [projectFormRoomId, setProjectFormRoomId] = useState<number | null>(
-    null
-  );
-  const [showEditProjectModal, setShowEditProjectModal] = useState(false);
-  const [projectToEdit, setProjectToEdit] = useState<Project | null>(null);
-  const [showEditRoomForm, setShowEditRoomForm] = useState(false);
-  const [roomToEdit, setRoomToEdit] = useState<Room | null>(null);
-
-  // Estado para pesquisa flutuante
-  const [floatingSearchQuery, setFloatingSearchQuery] = useState('');
-
-  // Filtrar projetos para pesquisa flutuante
-  const filteredProjects = React.useMemo(() => {
-    if (!floatingSearchQuery.trim()) return [];
-    
-    const query = floatingSearchQuery.toLowerCase();
-    const allProjects: Array<Project & { room: Room }> = [];
-    
-    rooms.forEach(room => {
-      if (room.projects) {
-        room.projects.forEach(project => {
-          allProjects.push({ ...project, room });
-        });
-      }
-    });
-    
-    return allProjects.filter(project => 
-      project.title.toLowerCase().includes(query) ||
-      `#${project.number}`.toLowerCase().includes(query) ||
-      project.room.name.toLowerCase().includes(query)
-    );
-  }, [rooms, floatingSearchQuery]);
-
-  // Estados de interação com o mapa
-  const [isTracingPath, setIsTracingPath] = useState(false);
-  const [tracedPath, setTracedPath] = useState<Array<[number, number]>>([]);
-  const [tempRoomPosition, setTempRoomPosition] = useState<{
-    x: number;
-    y: number;
-  } | null>(null);
-  const [cursorPosition, setCursorPosition] = useState<{
-    x: number;
-    y: number;
-  } | null>(null);
+  const [hoveredLocalId, setHoveredLocalId] = useState<string | null>(null);
+  const [form, setForm] = useState<{ project: Project | null; localId: string | null } | null>(null);
+  const [sidebarMinimized, setSidebarMinimized] = useState(false);
+  const [viewMode, setViewMode] = useState<"2d" | "3d">("2d");
 
   // Estados de pan e zoom
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
-  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
-  const [panAtDragStart, setPanAtDragStart] = useState({ x: 0, y: 0 });
-  const [hasDragged, setHasDragged] = useState(false);
+  const hasDraggedRef = useRef(false);
 
-  // Ajustar zoom inicial baseado na largura da tela
-  useEffect(() => {
-    // Iniciar sem zoom automático: força escala 1 e sem pan
-    // Isso evita que o mapa seja escalado automaticamente conforme o container
-    setZoom(1);
-    setPan({ x: 0, y: 0 });
-    // Não adicionar listeners de resize — manter comportamento simples e previsível
+  // Valores "vivos" de zoom/pan: os eventos escrevem aqui e o estado é
+  // sincronizado uma vez por frame, evitando re-render a cada evento
+  const viewRef = useRef({ zoom: 1, pan: { x: 0, y: 0 } });
+  const dragRef = useRef({ startX: 0, startY: 0, panX: 0, panY: 0 });
+  const rafRef = useRef<number | null>(null);
+  const mapImgRef = useRef<HTMLImageElement>(null);
+  const settleTimerRef = useRef<number | null>(null);
+  const [svgSize, setSvgSize] = useState({ w: 0, h: 0 });
+
+  const commitView = useCallback(() => {
+    if (rafRef.current !== null) return;
+    rafRef.current = requestAnimationFrame(() => {
+      rafRef.current = null;
+      setZoom(viewRef.current.zoom);
+      setPan({ ...viewRef.current.pan });
+    });
   }, []);
 
-  // Função para carregar salas (useCallback para evitar re-criação)
-  const loadRooms = useCallback(async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      
-      // Carregar salas e projetos em paralelo
-      const [roomsData, projectsData] = await Promise.all([
-        api.getRooms(),
-        api.getProjects()
-      ]);
-      
-      // Anexar projetos às salas baseado no roomId
-      const roomsWithProjects: RoomWithProjects[] = roomsData.map(room => ({
-        ...room,
-        projects: projectsData.filter(project => project.roomId === room.id)
-      }));
-      
-      setRooms(roomsWithProjects);
-    } catch (err) {
-      setError("Erro ao carregar salas do mapa");
-    } finally {
-      setLoading(false);
-    }
-  }, []); // Array vazio = função estável, nunca muda
+  // Escala px/unidade do viewBox (0-100, preserveAspectRatio meet) e offsets
+  const getViewBoxMetrics = useCallback(() => {
+    const svg = svgRef.current;
+    if (!svg) return null;
+    const rect = svg.getBoundingClientRect();
+    const s = Math.min(rect.width, rect.height) / 100;
+    return {
+      rect,
+      s,
+      ox: (rect.width - 100 * s) / 2,
+      oy: (rect.height - 100 * s) / 2,
+    };
+  }, []);
 
-  // Carregar salas na montagem
+  // Coordenada de tela -> coordenada do viewBox (antes de zoom/pan)
+  const clientToViewBox = useCallback(
+    (clientX: number, clientY: number) => {
+      const m = getViewBoxMetrics();
+      if (!m) return { x: 0, y: 0 };
+      return {
+        x: (clientX - m.rect.left - m.ox) / m.s,
+        y: (clientY - m.rect.top - m.oy) / m.s,
+      };
+    },
+    [getViewBoxMetrics]
+  );
+
+  const zoomAt = useCallback(
+    (factor: number, vx: number, vy: number) => {
+      const { zoom: z, pan: p } = viewRef.current;
+      const nz = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, z * factor));
+      const k = nz / z;
+      viewRef.current = {
+        zoom: nz,
+        pan: { x: vx - (vx - p.x) * k, y: vy - (vy - p.y) * k },
+      };
+      commitView();
+    },
+    [commitView]
+  );
+
+  // Centraliza a câmera 2D num local
+  const focusLocal = useCallback(
+    (local: Local) => {
+      const c = mapToViewBox(local.centro.x, local.centro.y);
+      const z = Math.max(viewRef.current.zoom, FOCUS_ZOOM);
+      viewRef.current = { zoom: z, pan: { x: 50 - c.x * z, y: 50 - c.y * z } };
+      commitView();
+    },
+    [commitView]
+  );
+
+  const loadProjects = useCallback(async () => {
+    setProjects(await api.getProjects());
+  }, []);
+
   useEffect(() => {
-    loadRooms();
-  }, [loadRooms]); // Agora pode incluir loadRooms com segurança (useCallback garante estabilidade)
+    Promise.all([loadLocais(), api.getProjects()])
+      .then(([l, p]) => {
+        setLocais(l);
+        setProjects(p);
+      })
+      .catch(() => setError("Erro ao carregar o mapa"))
+      .finally(() => setLoading(false));
+  }, []);
 
   // Limpar mensagens
   useEffect(() => {
-    if (successMessage) {
-      const timer = setTimeout(() => setSuccessMessage(null), 3000);
-      return () => clearTimeout(timer);
-    }
+    if (!successMessage) return;
+    const timer = setTimeout(() => setSuccessMessage(null), 3000);
+    return () => clearTimeout(timer);
   }, [successMessage]);
 
   useEffect(() => {
-    if (error) {
-      const timer = setTimeout(() => setError(null), 5000);
-      return () => clearTimeout(timer);
-    }
+    if (!error) return;
+    const timer = setTimeout(() => setError(null), 5000);
+    return () => clearTimeout(timer);
   }, [error]);
 
   // Configurar wheel listener com { passive: false } para evitar warning
@@ -154,875 +148,380 @@ const NewMap: React.FC = () => {
 
     const handleWheel = (e: WheelEvent) => {
       e.preventDefault();
-      const delta = e.deltaY > 0 ? 0.95 : 1.05;
-      setZoom((prev) => Math.max(0.5, Math.min(5, prev * delta)));
+      // Fator proporcional ao delta: suave no trackpad, firme na roda do mouse
+      const dy = e.deltaMode === 1 ? e.deltaY * 16 : e.deltaY;
+      const factor = Math.exp(-Math.max(-100, Math.min(100, dy)) * 0.002);
+      const { x, y } = clientToViewBox(e.clientX, e.clientY);
+      zoomAt(factor, x, y);
     };
 
-    svg.addEventListener('wheel', handleWheel, { passive: false });
-    return () => svg.removeEventListener('wheel', handleWheel);
+    svg.addEventListener("wheel", handleWheel, { passive: false });
+    return () => svg.removeEventListener("wheel", handleWheel);
+  }, [clientToViewBox, zoomAt]);
+
+  // Acompanhar tamanho do SVG para posicionar a imagem do mapa
+  useEffect(() => {
+    const svg = svgRef.current;
+    if (!svg) return;
+    const ro = new ResizeObserver(([entry]) => {
+      const { width, height } = entry.contentRect;
+      setSvgSize({ w: width, h: height });
+    });
+    ro.observe(svg);
+    return () => ro.disconnect();
   }, []);
 
-  // Handlers do mapa
-  const handleMapClick = (e: React.MouseEvent<SVGSVGElement>) => {
-    // Se arrastou, não adiciona ponto
-    if (hasDragged) {
-      setHasDragged(false);
-      return;
-    }
+  // Posiciona o <img> do mapa via transform de GPU. Durante o gesto usa
+  // will-change (fluido); ao parar, remove para o navegador re-rasterizar nítido
+  useEffect(() => {
+    const img = mapImgRef.current;
+    if (!img || !svgSize.w) return;
+    const s = Math.min(svgSize.w, svgSize.h) / 100;
+    const ox = (svgSize.w - 100 * s) / 2;
+    const oy = (svgSize.h - 100 * s) / 2;
+    const topLeft = mapToViewBox(0, 0);
+    const bottomRight = mapToViewBox(MAP_W, MAP_H);
+    img.style.width = `${(bottomRight.x - topLeft.x) * s}px`;
+    img.style.height = `${(bottomRight.y - topLeft.y) * s}px`;
+    const left = ox + s * (pan.x + zoom * topLeft.x);
+    const top = oy + s * (pan.y + zoom * topLeft.y);
+    img.style.willChange = "transform";
+    img.style.transform = `translate(${left}px, ${top}px) scale(${zoom})`;
+    if (settleTimerRef.current) window.clearTimeout(settleTimerRef.current);
+    settleTimerRef.current = window.setTimeout(() => {
+      img.style.willChange = "auto";
+    }, 200);
+  }, [zoom, pan, svgSize]);
 
-    if (isDragging) return;
+  // Índices derivados
+  const locaisPorId = useMemo(() => new Map(locais.map((l) => [l.id, l])), [locais]);
+  const projetosPorLocal = useMemo(() => {
+    const m = new Map<string, Project[]>();
+    for (const p of projects) m.set(p.localId, [...(m.get(p.localId) ?? []), p]);
+    return m;
+  }, [projects]);
+  const selecionaveis = useMemo(() => locais.filter((l) => l.selecionavel), [locais]);
+  const formas = useMemo(
+    () =>
+      selecionaveis.map((l) => ({
+        local: l,
+        d: l.poligono
+          ? "M" + l.poligono.map(([x, y]) => {
+              const p = mapToViewBox(x, y);
+              return `${p.x.toFixed(3)},${p.y.toFixed(3)}`;
+            }).join("L") + "Z"
+          : null,
+        c: mapToViewBox(l.centro.x, l.centro.y),
+      })),
+    [selecionaveis]
+  );
 
-    if (isTracingPath) {
-      const svg = e.currentTarget;
-      const rect = svg.getBoundingClientRect();
+  const selectedLocal = selectedLocalId ? locaisPorId.get(selectedLocalId) ?? null : null;
 
-      // Coordenadas do clique relativas ao SVG
-      const svgX = ((e.clientX - rect.left) / rect.width) * 100;
-      const svgY = ((e.clientY - rect.top) / rect.height) * 100;
-
-      // Aplicar transformação inversa do zoom e pan
-      const x = (svgX - pan.x) / zoom;
-      const y = (svgY - pan.y) / zoom;
-
-      // Restringir às dimensões válidas (0-100)
-      const clampedX = Math.max(0, Math.min(100, x));
-      const clampedY = Math.max(0, Math.min(100, y));
-
-      setTracedPath((prev) => [...prev, [clampedX, clampedY]]);
-      setTempRoomPosition({ x: clampedX, y: clampedY });
-    }
+  const selectLocal = (local: Local, focus = false) => {
+    setSelectedLocalId(local.id);
+    setSelectedProjectId(null);
+    if (focus) focusLocal(local);
   };
 
-  const handleRoomClick = (room: Room, e: React.MouseEvent) => {
-    e.stopPropagation();
-    setSelectedRoom(room);
-    setShowRoomDetails(true);
+  const selectProject = (project: Project) => {
+    const local = locaisPorId.get(project.localId);
+    setSelectedProjectId(project.id);
+    if (!local) return;
+    setSelectedLocalId(local.id);
+    focusLocal(local);
   };
 
-  const handleCreateRoom = async (
-    data: any,
-    path: Array<[number, number]>,
-    position: { x: number; y: number }
-  ) => {
-    try {
-      const roomData: CreateRoomRequest = {
-        name: data.name,
-        x: position.x,
-        y: position.y,
-        description: data.description || `Sala ${data.name}`,
-        path: path.length > 0 ? path : undefined,
-      };
-
-      await api.createRoom(roomData);
-      setSuccessMessage(`Sala "${data.name}" criada com sucesso!`);
-      setTracedPath([]);
-      setTempRoomPosition(null);
-      setIsTracingPath(false);
-      await loadRooms();
-    } catch (err) {
-      setError("Erro ao criar sala");
-      throw err;
-    }
-  };
-
-  // Handlers de CRUD de sala
-  const handleEditRoom = (room: Room) => {
-    setRoomToEdit(room);
-    setShowEditRoomForm(true);
-    setIsTracingPath(true); // Ativar modo de traçamento para edição
-  };
-
-  const handleUpdateRoom = async (
-    id: number, 
-    data: any, 
-    path: Array<[number, number]>, 
-    position: { x: number; y: number }
-  ) => {
-    try {
-      // Atualizar sala com dados, path e posição
-      const roomData: UpdateRoomRequest = {
-        name: data.name,
-        x: position.x,
-        y: position.y,
-        description: data.description,
-        path: path.length > 0 ? path : undefined,
-      };
-      
-      await api.updateRoom(id.toString(), roomData);
-      setSuccessMessage(`Sala "${data.name}" atualizada com sucesso!`);
-      await loadRooms();
-      setShowEditRoomForm(false);
-      setRoomToEdit(null);
-      setShowRoomDetails(false);
-      setTracedPath([]);
-      setTempRoomPosition(null);
-      setIsTracingPath(false);
-    } catch (err) {
-      setError("Erro ao atualizar sala");
-      throw err;
-    }
-  };
-
-  const handleDeleteRoom = async (room: Room) => {
-    try {
-      await api.deleteRoom(room.id.toString());
-      setSuccessMessage(`Sala "${room.name}" excluída com sucesso!`);
-      await loadRooms();
-      setShowRoomDetails(false);
-    } catch (err) {
-      setError("Erro ao excluir sala");
-    }
-  };
-
-  // Handlers de CRUD de projeto
-  const handleCreateProject = async (data: CreateProjectRequest) => {
-    try {
-      await api.createProject(data);
-      setSuccessMessage("Projeto criado com sucesso!");
-      await loadRooms();
-      setShowProjectForm(false);
-      setProjectFormRoomId(null);
-    } catch (err) {
-      setError("Erro ao criar projeto");
-      throw err;
-    }
-  };
-
-  const handleUpdateProject = async (id: number, data: UpdateProjectRequest) => {
-    try {
-      await api.updateProject(id.toString(), data);
-      setSuccessMessage("Projeto atualizado com sucesso!");
-      await loadRooms();
-      setShowEditProjectModal(false);
-      setProjectToEdit(null);
-    } catch (err) {
-      setError("Erro ao atualizar projeto");
-      throw err;
-    }
-  };
-
-  const handleDeleteProject = async (project: Project) => {
-    if (
-      !confirm(`Tem certeza que deseja excluir o projeto "${project.title}"?`)
-    )
-      return;
-
-    try {
-      await api.deleteProject(project.id.toString());
-      setSuccessMessage("Projeto excluído com sucesso!");
-      await loadRooms();
-    } catch (err) {
-      setError("Erro ao excluir projeto");
-    }
-  };
-
+  // Handlers de mouse do mapa 2D
   const handleMouseDown = (e: React.MouseEvent<SVGSVGElement>) => {
     e.preventDefault();
     setIsDragging(true);
-    setHasDragged(false);
-    setDragStart({ x: e.clientX, y: e.clientY });
-    setPanAtDragStart({ x: pan.x, y: pan.y });
+    hasDraggedRef.current = false;
+    dragRef.current = {
+      startX: e.clientX,
+      startY: e.clientY,
+      panX: viewRef.current.pan.x,
+      panY: viewRef.current.pan.y,
+    };
   };
 
   const handleMouseMove = (e: React.MouseEvent<SVGSVGElement>) => {
-    const svg = e.currentTarget;
-    const rect = svg.getBoundingClientRect();
-
-    // Converter coordenadas de tela para SVG para cursor position
-    const svgX = ((e.clientX - rect.left) / rect.width) * 100;
-    const svgY = ((e.clientY - rect.top) / rect.height) * 100;
-
-    // Atualizar posição do cursor quando estiver traçando
-    if (isTracingPath && !isDragging) {
-      // Aplicar transformação inversa do zoom e pan
-      const x = (svgX - pan.x) / zoom;
-      const y = (svgY - pan.y) / zoom;
-
-      // Restringir às dimensões válidas
-      const clampedX = Math.max(0, Math.min(100, x));
-      const clampedY = Math.max(0, Math.min(100, y));
-
-      setCursorPosition({ x: clampedX, y: clampedY });
-      return;
-    }
-
     if (!isDragging) return;
-
-    // Calcular delta em PIXELS desde o início do drag
-    const deltaPixelsX = e.clientX - dragStart.x;
-    const deltaPixelsY = e.clientY - dragStart.y;
-
-    // Marcar como arrastado se moveu mais de 5 pixels
-    if (Math.abs(deltaPixelsX) > 5 || Math.abs(deltaPixelsY) > 5) {
-      setHasDragged(true);
-    }
-
-    // Converter pixels para unidades do viewBox SVG mantendo sensibilidade constante
-    const deltaSvgX = (deltaPixelsX / rect.width) * 100;
-    const deltaSvgY = (deltaPixelsY / rect.height) * 100;
-
-    // Aplicar o delta ao PAN INICIAL
-    const newPan = {
-      x: panAtDragStart.x + deltaSvgX,
-      y: panAtDragStart.y + deltaSvgY,
+    const drag = dragRef.current;
+    const dx = e.clientX - drag.startX;
+    const dy = e.clientY - drag.startY;
+    if (Math.abs(dx) > 5 || Math.abs(dy) > 5) hasDraggedRef.current = true;
+    // Pixels -> unidades do viewBox (mesma escala nos dois eixos)
+    const s = getViewBoxMetrics()?.s ?? 1;
+    viewRef.current = {
+      zoom: viewRef.current.zoom,
+      pan: { x: drag.panX + dx / s, y: drag.panY + dy / s },
     };
-    setPan(newPan);
+    commitView();
   };
 
-  const handleMouseUp = () => {
-    setIsDragging(false);
+  const stopDragging = () => setIsDragging(false);
+
+  // Clique num local (ignora se o gesto foi um arraste do mapa)
+  const handleLocalClick = (local: Local) => {
+    if (hasDraggedRef.current) return;
+    selectLocal(local);
   };
 
-  const handleMouseLeave = () => {
-    setIsDragging(false);
-    // Ocultar cursor virtual quando sair da área do mapa
-    if (isTracingPath) {
-      setCursorPosition(null);
+  // Botões aproximam/afastam em torno do centro da tela
+  const zoomIn = () => zoomAt(1.25, 50, 50);
+  const zoomOut = () => zoomAt(1 / 1.25, 50, 50);
+  const resetView = () => {
+    viewRef.current = { zoom: 1, pan: { x: 0, y: 0 } };
+    commitView();
+  };
+
+  // CRUD de projetos
+  const handleSubmitProject = async (data: CreateProjectRequest) => {
+    if (form?.project) {
+      await api.updateProject(form.project.id, data);
+      setSuccessMessage(`Trabalho #${data.number} atualizado.`);
+    } else {
+      await api.createProject(data);
+      setSuccessMessage(`Trabalho #${data.number} cadastrado.`);
+    }
+    setForm(null);
+    await loadProjects();
+    setSelectedLocalId(data.localId);
+  };
+
+  const handleDeleteProject = async (project: Project) => {
+    if (!confirm(`Excluir o trabalho #${project.number} "${project.title}"?`)) return;
+    try {
+      await api.deleteProject(project.id);
+      setSuccessMessage(`Trabalho #${project.number} excluído.`);
+      await loadProjects();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Erro ao excluir trabalho");
     }
   };
 
-  const zoomIn = () => setZoom((prev) => Math.min(5, prev * 1.1));
-  const zoomOut = () => setZoom((prev) => Math.max(0.5, prev / 1.1));
-  const resetView = () => {
-    setZoom(1);
-    setPan({ x: 0, y: 0 });
-  };
-
-  // Handler para projeto selecionado na pesquisa flutuante
-  const handleFloatingProjectSelect = (project: Project & { room: Room }) => {
-    setSelectedProjectId(project.id);
-    setSelectedRoom(project.room);
-    setFloatingSearchQuery(''); // Limpar pesquisa após seleção
-  };
+  const panelOpen = Boolean(selectedLocal);
 
   return (
     <div className="h-screen w-full bg-gray-100 flex overflow-hidden relative">
-      {/* Detalhes decorativos de fundo */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
-        {/* Círculos decorativos superiores */}
-        <div className="absolute top-10 left-20 w-32 h-32 rounded-full bg-[#359830] opacity-5 blur-3xl"></div>
-        <div className="absolute top-32 right-32 w-40 h-40 rounded-full bg-[#359830] opacity-4 blur-2xl"></div>
-        <div className="absolute top-20 left-1/3 w-24 h-24 rounded-full bg-[#359830] opacity-6 blur-xl"></div>
-        
-        {/* Círculos decorativos inferiores */}
-        <div className="absolute bottom-20 left-40 w-36 h-36 rounded-full bg-[#359830] opacity-5 blur-3xl"></div>
-        <div className="absolute bottom-32 right-24 w-28 h-28 rounded-full bg-[#359830] opacity-6 blur-2xl"></div>
-        <div className="absolute bottom-16 left-2/3 w-32 h-32 rounded-full bg-[#359830] opacity-4 blur-xl"></div>
-        
-        {/* Círculos médios espalhados */}
-        <div className="absolute top-1/3 right-16 w-20 h-20 rounded-full bg-[#359830] opacity-5 blur-2xl"></div>
-        <div className="absolute bottom-1/3 left-16 w-24 h-24 rounded-full bg-[#359830] opacity-6 blur-xl"></div>
-        <div className="absolute top-1/2 left-1/4 w-16 h-16 rounded-full bg-[#359830] opacity-4 blur-2xl"></div>
-        <div className="absolute top-2/3 right-1/3 w-28 h-28 rounded-full bg-[#359830] opacity-5 blur-3xl"></div>
-      </div>
-      {/* Sidebar */}
-      <MapSidebar
-        rooms={rooms}
+      <ProjectSidebar
+        projects={projects}
         loading={loading}
-        sidebarMinimized={sidebarMinimized}
-        setSidebarMinimized={setSidebarMinimized}
-        onProjectSelect={(projectId, room) => {
-          setSelectedProjectId(projectId);
-          setSelectedRoom(room);
-        }}
-        onRoomEdit={handleEditRoom}
-        onRoomDelete={handleDeleteRoom}
-        onProjectCreate={(roomId) => {
-          setProjectFormRoomId(roomId);
-          setShowProjectForm(true);
-        }}
-        onProjectEdit={(project) => {
-          setProjectToEdit(project);
-          setShowEditProjectModal(true);
-        }}
-        onProjectDelete={handleDeleteProject}
-        onProjectCreateSubmit={handleCreateProject}
-        isTracingPath={isTracingPath}
-        onStartTracing={() => setIsTracingPath(true)}
-        onStopTracing={() => {
-          setIsTracingPath(false);
-          if (!showEditRoomForm) {
-            setTracedPath([]);
-            setTempRoomPosition(null);
-          }
-        }}
-        tracedPath={tracedPath}
-        roomPosition={tempRoomPosition}
-        onCreateRoom={handleCreateRoom}
-        showEditRoomForm={showEditRoomForm}
-        roomToEdit={roomToEdit}
-        onUpdateRoom={handleUpdateRoom}
-        onCancelEditRoom={() => {
-          setShowEditRoomForm(false);
-          setRoomToEdit(null);
-          setIsTracingPath(false);
-          setTracedPath([]);
-          setTempRoomPosition(null);
-        }}
+        isAdmin={isAdmin}
+        minimized={sidebarMinimized}
+        setMinimized={setSidebarMinimized}
+        selectedProjectId={selectedProjectId}
+        onSelect={selectProject}
+        onCreate={() => setForm({ project: null, localId: selectedLocalId })}
       />
 
-      {/* Canvas do Mapa */}
-      <div ref={containerRef} className="absolute inset-0 flex flex-col">
-        {/* Logo / Botão Sair - Topo Direito */}
-        {user ? (
-          <button
-            onClick={() => {
-              logout();
-              navigate("/");
-            }}
-            className="absolute top-20 right-4 z-50 flex items-center gap-2 px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg shadow-lg transition-colors"
-            title="Sair"
+      <div className="absolute inset-0">
+        {/* Alternância 2D / 3D */}
+        <div className="absolute top-4 left-1/2 -translate-x-1/2 z-30 flex bg-white border border-gray-300 rounded-lg shadow-md overflow-hidden text-sm font-medium">
+          {(["2d", "3d"] as const).map((mode) => (
+            <button
+              key={mode}
+              onClick={() => setViewMode(mode)}
+              className={`px-3 py-1.5 transition-colors ${
+                viewMode === mode ? "bg-green-600 text-white" : "text-gray-700 hover:bg-gray-50"
+              }`}
+              aria-pressed={viewMode === mode}
+            >
+              {mode.toUpperCase()}
+            </button>
+          ))}
+        </div>
+
+        {/* Login / sair */}
+        {!panelOpen &&
+          (user ? (
+            <button
+              onClick={() => {
+                logout();
+                navigate("/");
+              }}
+              className="absolute top-4 right-4 z-30 flex items-center gap-2 px-3 py-2 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 rounded-lg shadow-md text-sm"
+              title="Sair"
+            >
+              <LogOut className="w-4 h-4" /> Sair
+            </button>
+          ) : (
+            <img
+              src={institutoLogo}
+              alt="Logo Instituto"
+              onDoubleClick={() => navigate("/login")}
+              className="absolute top-4 right-4 z-30 h-10 w-auto cursor-pointer hover:opacity-80 transition-opacity"
+              title="Duplo clique para fazer login"
+            />
+          ))}
+
+        {/* Mensagens */}
+        {(successMessage || error) && (
+          <div
+            className={`absolute bottom-6 left-1/2 -translate-x-1/2 z-50 px-4 py-2.5 rounded-lg shadow-lg text-sm font-medium text-white ${
+              error ? "bg-red-500" : "bg-green-600"
+            }`}
+            role="status"
           >
-            <LogOut className="w-4 h-4" />
-            <span className="text-sm font-medium">Sair</span>
-          </button>
-        ) : (
-          <img
-            src={institutoLogo}
-            alt="Logo Instituto"
-            onDoubleClick={() => navigate("/login")}
-            className="absolute top-20 right-4 z-50 h-10 w-auto cursor-pointer hover:opacity-80 transition-opacity"
-            title="Duplo clique para fazer login"
-          />
+            {error ?? successMessage}
+          </div>
         )}
 
-        {/* Barra de Pesquisa Flutuante - Apenas quando sidebar minimizada */}
-        {sidebarMinimized && (
-          <div className="absolute top-4 left-1/2 transform -translate-x-1/2 z-40 animate-in fade-in slide-in-from-top duration-300 w-full max-w-md px-4">
-            <div className="relative">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
-                <input
-                  type="text"
-                  placeholder="Buscar projetos..."
-                  value={floatingSearchQuery}
-                  onChange={(e) => setFloatingSearchQuery(e.target.value)}
-                  className="w-full pl-10 pr-4 py-3 bg-white/95 backdrop-blur-sm border border-gray-200 rounded-xl shadow-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all text-sm"
-                />
-              </div>
-              
-              {/* Resultados da pesquisa */}
-              {floatingSearchQuery.trim() && (
-                <div className="absolute top-full left-0 right-0 mt-2 bg-white/95 backdrop-blur-sm border border-gray-200 rounded-xl shadow-xl max-h-80 overflow-y-auto animate-in fade-in slide-in-from-top duration-200">
-                  {filteredProjects.length === 0 ? (
-                    <div className="p-4 text-center text-gray-500 text-sm">
-                      Nenhum projeto encontrado
-                    </div>
-                  ) : (
-                    <div className="py-2">
-                      {filteredProjects.slice(0, 10).map((project) => (
-                        <button
-                          key={project.id}
-                          onClick={() => handleFloatingProjectSelect(project)}
-                          className="w-full px-4 py-3 text-left hover:bg-gray-50 transition-colors border-b border-gray-100 last:border-b-0 group"
-                        >
-                          <div className="flex items-start gap-3">
-                            <span className="inline-flex items-center px-2 py-1 rounded-md text-xs font-bold bg-gradient-to-r from-purple-100 to-pink-100 text-purple-700 flex-shrink-0">
-                              #{project.number}
-                            </span>
-                            <div className="flex-1 min-w-0">
-                              <h4 className="font-medium text-gray-900 text-sm truncate group-hover:text-blue-600 transition-colors">
-                                {project.title}
-                              </h4>
-                              <p className="text-xs text-gray-600 mt-1 flex items-center gap-1">
-                                <MapPin className="w-3 h-3" />
-                                {project.room.name}
-                              </p>
-                            </div>
-                          </div>
-                        </button>
-                      ))}
-                      {filteredProjects.length > 10 && (
-                        <div className="px-4 py-2 text-center text-xs text-gray-500 border-t border-gray-100">
-                          +{filteredProjects.length - 10} resultados
-                        </div>
-                      )}
-                    </div>
-                  )}
+        {viewMode === "3d" && (
+          <div className="absolute inset-0 z-20 bg-white">
+            <Suspense
+              fallback={
+                <div className="absolute inset-0 flex items-center justify-center text-sm text-gray-600">
+                  Carregando visão 3D…
                 </div>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* Mensagens de Notificação */}
-        {successMessage && (
-          <div className="absolute top-20 right-4 bg-green-500 text-white px-4 py-3 rounded-lg shadow-lg z-50 flex items-center gap-2">
-            <span className="text-sm font-medium">{successMessage}</span>
-            <button
-              onClick={() => setSuccessMessage(null)}
-              className="text-white/80 hover:text-white"
+              }
             >
-              <svg
-                className="w-4 h-4"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M6 18L18 6M6 6l12 12"
-                />
-              </svg>
-            </button>
+              <Map3D
+                locais={locais}
+                projetosPorLocal={projetosPorLocal}
+                selectedLocalId={selectedLocalId}
+                onLocalClick={(l) => selectLocal(l)}
+              />
+            </Suspense>
           </div>
         )}
 
-        {error && (
-          <div className="absolute top-20 right-4 bg-red-500 text-white px-4 py-3 rounded-lg shadow-lg z-50 flex items-center gap-2">
-            <span className="text-sm font-medium">{error}</span>
-            <button
-              onClick={() => setError(null)}
-              className="text-white/80 hover:text-white"
-            >
-              <svg
-                className="w-4 h-4"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M6 18L18 6M6 6l12 12"
-                />
-              </svg>
-            </button>
-          </div>
-        )}
-
-        {/* Dica de navegação durante traçamento */}
-        {isTracingPath && (
-          <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 bg-blue-500 text-white px-4 py-2 rounded-lg shadow-lg z-50 text-sm">
-            💡 Dica: Use{" "}
-            <kbd className="bg-blue-600 px-1.5 py-0.5 rounded mx-1">Shift</kbd>{" "}
-            + arrastar ou{" "}
-            <kbd className="bg-blue-600 px-1.5 py-0.5 rounded mx-1">
-              botão direito
-            </kbd>{" "}
-            para mover o mapa
-          </div>
-        )}
-
-        {/* Controles de Zoom - Canto Inferior Direito */}
-        <div className="absolute bottom-6 right-6 z-10 flex flex-col gap-2">
-          <button
-            onClick={zoomIn}
-            className="bg-white border border-gray-300 rounded-lg p-2 shadow-md hover:bg-gray-50 transition-colors"
-            title="Zoom In"
-          >
+        {/* Controles de zoom */}
+        <div
+          className={`absolute bottom-6 z-10 flex flex-col gap-2 transition-[right] ${
+            panelOpen ? "right-[392px]" : "right-6"
+          } ${viewMode === "3d" ? "hidden" : ""}`}
+        >
+          <button onClick={zoomIn} className="bg-white border border-gray-300 rounded-lg p-2 shadow-md hover:bg-gray-50" title="Aproximar">
             <Plus className="w-5 h-5 text-gray-700" />
           </button>
-          <button
-            onClick={zoomOut}
-            className="bg-white border border-gray-300 rounded-lg p-2 shadow-md hover:bg-gray-50 transition-colors"
-            title="Zoom Out"
-          >
-            <svg
-              className="w-5 h-5 text-gray-700"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M20 12H4"
-              />
-            </svg>
+          <button onClick={zoomOut} className="bg-white border border-gray-300 rounded-lg p-2 shadow-md hover:bg-gray-50" title="Afastar">
+            <Minus className="w-5 h-5 text-gray-700" />
           </button>
-          <button
-            onClick={resetView}
-            className="bg-white border border-gray-300 rounded-lg p-2 shadow-md hover:bg-gray-50 transition-colors"
-            title="Reset View"
-          >
-            <svg
-              className="w-5 h-5 text-gray-700"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-              />
-            </svg>
+          <button onClick={resetView} className="bg-white border border-gray-300 rounded-lg p-2 shadow-md hover:bg-gray-50" title="Ver mapa inteiro">
+            <RotateCcw className="w-5 h-5 text-gray-700" />
           </button>
-          <div className="bg-white border border-gray-300 rounded-lg px-3 py-2 shadow-md text-xs text-gray-600 text-center">
+          <div className="bg-white border border-gray-300 rounded-lg px-2 py-1.5 shadow-md text-xs text-gray-600 text-center">
             {(zoom * 100).toFixed(0)}%
           </div>
         </div>
 
-        {/* SVG Canvas */}
+        {/* Mapa base como <img>: composto na GPU, posicionado pelo efeito de zoom/pan */}
+        <div className="absolute inset-0 overflow-hidden bg-white pointer-events-none">
+          <img
+            ref={mapImgRef}
+            src={`${import.meta.env.BASE_URL}mapa/mapa-feira-2026.svg`}
+            alt="Mapa da feira"
+            draggable={false}
+            className="absolute left-0 top-0 max-w-none select-none"
+            style={{ transformOrigin: "0 0" }}
+          />
+        </div>
+
+        {/* Camada interativa: locais clicáveis por cima do mapa */}
         <svg
           ref={svgRef}
-          className={`absolute inset-0 w-full h-full border border-gray-300 rounded-lg shadow-lg bg-white ${
-            isDragging
-              ? "cursor-grabbing"
-              : isTracingPath
-              ? "cursor-none"
-              : "cursor-grab"
-          }`}
+          className={`absolute inset-0 w-full h-full ${isDragging ? "cursor-grabbing" : "cursor-grab"}`}
           viewBox="0 0 100 100"
           preserveAspectRatio="xMidYMid meet"
-          onClick={handleMapClick}
           onMouseDown={handleMouseDown}
           onMouseMove={handleMouseMove}
-          onMouseUp={handleMouseUp}
-          onMouseLeave={handleMouseLeave}
+          onMouseUp={stopDragging}
+          onMouseLeave={stopDragging}
           onContextMenu={(e) => e.preventDefault()}
           style={{ userSelect: "none" }}
         >
-          {/* Grupo principal com transformações de zoom e pan */}
-          <g 
-            transform={`translate(${pan.x}, ${pan.y}) scale(${zoom})`}
-            style={{ 
-              transition: isDragging ? 'none' : 'transform 0.3s cubic-bezier(0.4, 0.0, 0.2, 1)',
-            }}
-          >
-            {/* Imagem do mapa como fundo */}
-            <image
-              href={`${import.meta.env.BASE_URL}mapa/mapa.jpg`}
-              x="0"
-              y="0"
-              width="100"
-              height="100"
-              preserveAspectRatio="xMidYMid slice"
-            />
-
-            {/* Detalhes decorativos sutis */}
-            <g opacity="0.08">
-              {/* Círculos decorativos no canto superior esquerdo */}
-              <circle cx="5" cy="5" r="3" fill="#359830" />
-              <circle cx="12" cy="3" r="2" fill="#359830" />
-              <circle cx="8" cy="10" r="1.5" fill="#359830" />
-              
-              {/* Círculos decorativos no canto superior direito */}
-              <circle cx="95" cy="6" r="2.5" fill="#359830" />
-              <circle cx="88" cy="4" r="1.8" fill="#359830" />
-              <circle cx="92" cy="12" r="2" fill="#359830" />
-              
-              {/* Círculos decorativos no canto inferior esquerdo */}
-              <circle cx="6" cy="94" r="2.2" fill="#359830" />
-              <circle cx="13" cy="96" r="1.5" fill="#359830" />
-              <circle cx="9" cy="88" r="2.8" fill="#359830" />
-              
-              {/* Círculos decorativos no canto inferior direito */}
-              <circle cx="94" cy="95" r="2" fill="#359830" />
-              <circle cx="87" cy="93" r="1.6" fill="#359830" />
-              <circle cx="91" cy="88" r="2.3" fill="#359830" />
-            </g>
-
-            {/* Grid de referência (opcional) */}
-            <g opacity="0.2">
-              {[0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100].map((val) => (
-                <React.Fragment key={val}>
-                  <line
-                    x1={val}
-                    y1="0"
-                    x2={val}
-                    y2="100"
-                    stroke="#999"
-                    strokeWidth={0.2 / zoom}
-                  />
-                  <line
-                    x1="0"
-                    y1={val}
-                    x2="100"
-                    y2={val}
-                    stroke="#999"
-                    strokeWidth={0.2 / zoom}
-                  />
-                </React.Fragment>
-              ))}
-            </g>
-
-            {/* Renderizar salas da API */}
-            {rooms.map((room) => {
-              // Verificar se deve mostrar esta sala
-              const shouldShowRoom = user || (selectedProjectId && room.projects?.some(p => p.id === selectedProjectId));
-              const isSelectedProjectRoom = selectedProjectId && room.projects?.some(p => p.id === selectedProjectId);
-              
+          <g transform={`translate(${pan.x}, ${pan.y}) scale(${zoom})`}>
+            {formas.map(({ local, d }) => {
+              if (!d) return null;
+              const temProjetos = projetosPorLocal.has(local.id);
+              const ativo = local.id === selectedLocalId;
+              const hover = local.id === hoveredLocalId;
               return (
-                <g key={room.id}>
-                  {/* Renderizar caminho apenas se um projeto dessa sala estiver selecionado */}
-                  {room.path && room.path.length > 0 && isSelectedProjectRoom && (
-                    <g>
-                      {/* Linha do caminho (destacar em vermelho) */}
-                      <polyline
-                        points={room.path
-                          .map((point) => `${point[0]},${point[1]}`)
-                          .join(" ")}
-                        fill="none"
-                        stroke="#ef4444"
-                        strokeWidth={0.7 / zoom}
-                        strokeDasharray={`${1.2 / zoom} ${1.2 / zoom}`}
-                        className="opacity-95"
-                        style={{
-                          filter: 'drop-shadow(0 2px 6px rgba(239,68,68,0.35))'
-                        }}
-                      />
-                      {/* Pontos intermediários do caminho (vermelho) */}
-                      {room.path.slice(0, -1).map((point, index) => (
-                        <circle
-                          key={`path-${room.id}-${index}`}
-                          cx={point[0]}
-                          cy={point[1]}
-                          r={0.8 / zoom}
-                          fill="#ef4444"
-                          stroke="#b91c1c"
-                          strokeWidth={0.22 / zoom}
-                          className="opacity-95"
-                        />
-                      ))}
-                    </g>
-                  )}
-                  
-                  {/* Renderizar ponto apenas se deve ser mostrado */}
-                  {shouldShowRoom && (
-                    <>
-                      {/* Círculo do ponto de destino */}
-                      <circle
-                        cx={room.x}
-                        cy={room.y}
-                        r={(isSelectedProjectRoom ? 1.2 : 0.8) / zoom}
-                        fill={isSelectedProjectRoom ? "#ef4444" : "#3B82F6"}
-                        stroke={isSelectedProjectRoom ? "#b91c1c" : "#1E40AF"}
-                        strokeWidth={0.2 / zoom}
-                        className="hover:fill-blue-700 transition-all cursor-pointer"
-                        style={{
-                          filter: isSelectedProjectRoom 
-                            ? 'drop-shadow(0 0 8px rgba(239, 68, 68, 0.6))' 
-                            : 'none'
-                        }}
-                        onClick={(e) => handleRoomClick(room, e)}
-                      />
-                      {/* Label do ponto com borda branca para melhor legibilidade */}
-                      <text
-                        x={room.x}
-                        y={room.y - (isSelectedProjectRoom ? 2.8 : 2.2)}
-                        textAnchor="middle"
-                        className="pointer-events-none"
-                        fontSize={`${(isSelectedProjectRoom ? 2.2 : 1.8) / zoom}px`}
-                        style={{
-                          fontSize: `${(isSelectedProjectRoom ? 2.2 : 1.8) / zoom}px`,
-                          fontFamily: "Arial, sans-serif",
-                          fontWeight: isSelectedProjectRoom ? "700" : "600",
-                          fill: isSelectedProjectRoom ? "#b91c1c" : "#1F2937",
-                          stroke: "#FFFFFF",
-                          strokeWidth: `${0.6 / zoom}px`,
-                          paintOrder: "stroke fill",
-                        }}
-                      >
-                        {room.name}
-                      </text>
-                      {/* Informações adicionais em hover */}
-                      <title>
-                        {room.name} - {room.description}
-                        {room.path && ` (Caminho com ${room.path.length} pontos)`}
-                      </title>
-                    </>
+                <path
+                  key={local.id}
+                  d={d}
+                  fill={ativo ? "#16a34a" : temProjetos ? "#22c55e" : hover ? "#3b82f6" : "transparent"}
+                  fillOpacity={ativo ? 0.35 : temProjetos ? 0.18 : hover ? 0.15 : 0}
+                  stroke={ativo ? "#15803d" : hover ? "#2563eb" : "none"}
+                  strokeWidth={2}
+                  vectorEffect="non-scaling-stroke"
+                  className="cursor-pointer"
+                  onMouseEnter={() => setHoveredLocalId(local.id)}
+                  onMouseLeave={() => setHoveredLocalId((h) => (h === local.id ? null : h))}
+                  onClick={() => handleLocalClick(local)}
+                >
+                  <title>{local.bloco ? `Bloco ${local.bloco} · ${local.nome}` : local.nome}</title>
+                </path>
+              );
+            })}
+
+            {/* Contagem de trabalhos por local; locais pontuais viram marcador */}
+            {formas.map(({ local, c, d }) => {
+              const n = projetosPorLocal.get(local.id)?.length ?? 0;
+              if (!n && d) return null;
+              const r = (n ? 1.4 : 0.8) / zoom;
+              const ativo = local.id === selectedLocalId;
+              return (
+                <g
+                  key={`m-${local.id}`}
+                  className="cursor-pointer"
+                  onClick={() => handleLocalClick(local)}
+                >
+                  <title>{local.nome}</title>
+                  <circle
+                    cx={c.x}
+                    cy={c.y}
+                    r={r}
+                    fill={n ? (ativo ? "#15803d" : "#16a34a") : "#6b7280"}
+                    stroke="#fff"
+                    strokeWidth={0.25 / zoom}
+                  />
+                  {n > 0 && (
+                    <text
+                      x={c.x}
+                      y={c.y}
+                      textAnchor="middle"
+                      dominantBaseline="central"
+                      fontSize={1.5 / zoom}
+                      fontWeight={700}
+                      fill="#fff"
+                      pointerEvents="none"
+                    >
+                      {n}
+                    </text>
                   )}
                 </g>
               );
             })}
-
-            {/* Renderizar caminho sendo traçado manualmente */}
-            {isTracingPath && tracedPath.length > 0 && (
-              <g>
-                <polyline
-                  points={tracedPath
-                    .map((point) => `${point[0]},${point[1]}`)
-                    .join(" ")}
-                  fill="none"
-                  stroke="#F59E42"
-                  strokeWidth={0.6 / zoom}
-                  strokeDasharray={`${1.2 / zoom} ${1.2 / zoom}`}
-                  className="opacity-80"
-                />
-                {tracedPath.map((point, idx) => (
-                  <g key={`trace-${idx}`}>
-                    <circle
-                      cx={point[0]}
-                      cy={point[1]}
-                      r={1.5 / zoom}
-                      fill="#F59E42"
-                      stroke="#D97706"
-                      strokeWidth={0.3 / zoom}
-                      className="opacity-90"
-                    />
-                    {/* Número do ponto */}
-                    <text
-                      x={point[0]}
-                      y={point[1] - 1.8 / zoom}
-                      textAnchor="middle"
-                      className="pointer-events-none"
-                      fontSize={`${1.5 / zoom}px`}
-                      style={{
-                        fontSize: `${1.5 / zoom}px`,
-                        fontFamily: "Arial, sans-serif",
-                        fontWeight: "bold",
-                        fill: "#D97706",
-                        stroke: "#FFFFFF",
-                        strokeWidth: `${0.4 / zoom}px`,
-                        paintOrder: "stroke fill",
-                      }}
-                    >
-                      {idx + 1}
-                    </text>
-                  </g>
-                ))}
-              </g>
-            )}
-
-            {/* Preview do cursor para o próximo ponto */}
-            {isTracingPath && cursorPosition && (
-              <g className="pointer-events-none">
-                {/* Círculo externo pulsante */}
-                <circle
-                  cx={cursorPosition.x}
-                  cy={cursorPosition.y}
-                  r={2.5 / zoom}
-                  fill="none"
-                  stroke="#F59E42"
-                  strokeWidth={0.4 / zoom}
-                  className="opacity-50"
-                >
-                  <animate
-                    attributeName="r"
-                    values={`${2.5 / zoom};${3.5 / zoom};${2.5 / zoom}`}
-                    dur="1.5s"
-                    repeatCount="indefinite"
-                  />
-                  <animate
-                    attributeName="opacity"
-                    values="0.5;0.2;0.5"
-                    dur="1.5s"
-                    repeatCount="indefinite"
-                  />
-                </circle>
-                {/* Círculo interno do cursor */}
-                <circle
-                  cx={cursorPosition.x}
-                  cy={cursorPosition.y}
-                  r={1.2 / zoom}
-                  fill="#F59E42"
-                  stroke="#D97706"
-                  strokeWidth={0.3 / zoom}
-                  className="opacity-70"
-                />
-                {/* Linhas de mira */}
-                <line
-                  x1={cursorPosition.x - 3 / zoom}
-                  y1={cursorPosition.y}
-                  x2={cursorPosition.x + 3 / zoom}
-                  y2={cursorPosition.y}
-                  stroke="#D97706"
-                  strokeWidth={0.2 / zoom}
-                  className="opacity-60"
-                />
-                <line
-                  x1={cursorPosition.x}
-                  y1={cursorPosition.y - 3 / zoom}
-                  x2={cursorPosition.x}
-                  y2={cursorPosition.y + 3 / zoom}
-                  stroke="#D97706"
-                  strokeWidth={0.2 / zoom}
-                  className="opacity-60"
-                />
-                {/* Linha de conexão com o último ponto */}
-                {tracedPath.length > 0 && (
-                  <line
-                    x1={tracedPath[tracedPath.length - 1][0]}
-                    y1={tracedPath[tracedPath.length - 1][1]}
-                    x2={cursorPosition.x}
-                    y2={cursorPosition.y}
-                    stroke="#F59E42"
-                    strokeWidth={0.4 / zoom}
-                    strokeDasharray={`${0.8 / zoom} ${0.8 / zoom}`}
-                    className="opacity-40"
-                  />
-                )}
-              </g>
-            )}
-
-            {/* Loading overlay */}
-            {loading && (
-              <g>
-                <rect
-                  x="0"
-                  y="0"
-                  width="100"
-                  height="100"
-                  fill="rgba(255,255,255,0.7)"
-                />
-                <text
-                  x="50"
-                  y="50"
-                  textAnchor="middle"
-                  className="fill-gray-600"
-                  fontSize="3"
-                >
-                  Carregando pontos...
-                </text>
-              </g>
-            )}
-
-            {/* Ponto central de referência (removido - substituído pelas salas) */}
           </g>
         </svg>
+
+        {selectedLocal && (
+          <LocalPanel
+            local={selectedLocal}
+            projects={projetosPorLocal.get(selectedLocal.id) ?? []}
+            selectedProjectId={selectedProjectId}
+            isAdmin={isAdmin}
+            onClose={() => {
+              setSelectedLocalId(null);
+              setSelectedProjectId(null);
+            }}
+            onAddProject={() => setForm({ project: null, localId: selectedLocal.id })}
+            onEditProject={(p) => setForm({ project: p, localId: p.localId })}
+            onDeleteProject={handleDeleteProject}
+          />
+        )}
       </div>
 
-      {/* Modal de Detalhes da Sala */}
-      {showRoomDetails && selectedRoom && (
-        <RoomDetailsModal
-          room={selectedRoom}
-          onClose={() => {
-            setShowRoomDetails(false);
-            // Recarregar salas para atualizar projetos
-            loadRooms();
-          }}
-          onEdit={user ? handleEditRoom : undefined}
-          onDelete={user ? handleDeleteRoom : undefined}
-          onProjectCreate={user ? handleCreateProject : undefined}
-          onProjectEdit={user ? (project) => {
-            setProjectToEdit(project);
-            setShowEditProjectModal(true);
-          } : undefined}
-          onProjectDelete={user ? handleDeleteProject : undefined}
-          isLoggedIn={!!user}
-        />
-      )}
-
-      {/* Modal de Criar Projeto */}
-      {showProjectForm && projectFormRoomId && (
+      {form && (
         <ProjectForm
-          roomId={projectFormRoomId}
-          roomName={rooms.find((r) => r.id === projectFormRoomId)?.name || ""}
-          onSubmit={handleCreateProject}
-          onCancel={() => {
-            setShowProjectForm(false);
-            setProjectFormRoomId(null);
-          }}
-        />
-      )}
-
-      {/* Modal de Editar Projeto */}
-      {showEditProjectModal && projectToEdit && (
-        <EditProjectModal
-          project={projectToEdit}
-          rooms={rooms}
-          onSubmit={handleUpdateProject}
-          onCancel={() => {
-            setShowEditProjectModal(false);
-            setProjectToEdit(null);
-          }}
+          locais={selecionaveis}
+          project={form.project}
+          defaultLocalId={form.localId}
+          onSubmit={handleSubmitProject}
+          onClose={() => setForm(null)}
         />
       )}
     </div>
