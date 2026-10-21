@@ -1,3 +1,18 @@
 ﻿@tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Rota "GPS": pontos correndo da entrada até a sala */
+@keyframes rota-fluxo {
+  to {
+    stroke-dashoffset: -32;
+  }
+}
+.rota-anim {
+  animation: rota-fluxo 0.9s linear infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .rota-anim {
+    animation: none;
+  }
+}

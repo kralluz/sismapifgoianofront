@@ -6186,6 +6186,42 @@
      2600
     ]
    }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "id": "e-corredor",
+    "nome": "Corredor do Bloco E",
+    "bloco": "E",
+    "tipo": "area",
+    "selecionavel": true,
+    "altura": 0
+   },
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     3250,
+     3950
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "id": "c-corredor",
+    "nome": "Corredor em frente ao Bloco C",
+    "bloco": "C",
+    "tipo": "area",
+    "selecionavel": true,
+    "altura": 0
+   },
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     2650,
+     3600
+    ]
+   }
   }
  ]
 }

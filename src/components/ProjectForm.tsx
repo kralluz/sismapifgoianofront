@@ -23,7 +23,7 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
   onSubmit,
   onClose,
 }) => {
-  const [number, setNumber] = useState(project ? String(project.number) : "");
+  const [number, setNumber] = useState(project?.number != null ? String(project.number) : "");
   const [title, setTitle] = useState(project?.title ?? "");
   const [localId, setLocalId] = useState(project?.localId ?? defaultLocalId ?? "");
   const [complemento, setComplemento] = useState(project?.complemento ?? "");
@@ -48,8 +48,9 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const n = Number(number);
-    if (!Number.isInteger(n) || n < 1) return setError("Informe o número do trabalho.");
+    // Número em branco = item extra (estande, atividade)
+    const n = number.trim() ? Number(number) : null;
+    if (n !== null && (!Number.isInteger(n) || n < 1)) return setError("Número inválido.");
     if (title.trim().length < 2) return setError("Informe o título.");
     if (!localId) return setError("Escolha o local.");
     setSaving(true);
@@ -76,7 +77,7 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
       >
         <div className="flex items-center justify-between px-5 py-4 border-b">
           <h2 className="text-lg font-semibold text-gray-900">
-            {project ? `Editar trabalho #${project.number}` : "Novo trabalho"}
+            {project ? `Editar trabalho${project.number != null ? ` #${project.number}` : ""}` : "Novo trabalho"}
           </h2>
           <button type="button" onClick={onClose} className="p-1 rounded hover:bg-gray-100" aria-label="Fechar">
             <X className="w-5 h-5 text-gray-500" />
@@ -94,7 +95,8 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
                 onChange={(e) => setNumber(e.target.value)}
                 className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
                 autoFocus={!project}
-                required
+                placeholder="—"
+                title="Deixe em branco para estandes e atividades sem número"
               />
             </label>
             <label className="block">

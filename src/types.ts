@@ -51,7 +51,8 @@ export interface ProjectLocal {
 
 export interface Project {
   id: number;
-  number: number;
+  /** itens sem número: estandes e atividades */
+  number: number | null;
   title: string;
   localId: string;
   complemento: string | null;
@@ -61,7 +62,7 @@ export interface Project {
 }
 
 export interface CreateProjectRequest {
-  number: number;
+  number?: number | null;
   title: string;
   localId: string;
   complemento?: string | null;

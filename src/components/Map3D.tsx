@@ -3,6 +3,7 @@ import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import type { Project } from "../types";
 import { type Local, MAP_W, MAP_H, descreverLocal } from "../locais";
+import { type Rota, ENTRADA } from "../rota";
 
 // Escala px do mapa -> unidades da cena
 const S = 0.02;
@@ -29,6 +30,7 @@ interface Map3DProps {
   locais: Local[];
   projetosPorLocal: Map<string, Project[]>;
   selectedLocalId: string | null;
+  rota?: Rota | null;
   onLocalClick?: (local: Local) => void;
 }
 
@@ -62,11 +64,12 @@ interface Volume {
   local: Local;
 }
 
-const Map3D: React.FC<Map3DProps> = ({ locais, projetosPorLocal, selectedLocalId, onLocalClick }) => {
+const Map3D: React.FC<Map3DProps> = ({ locais, projetosPorLocal, selectedLocalId, rota, onLocalClick }) => {
   const mountRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<{
     volumes: Map<string, Volume>;
     pins: THREE.Group;
+    rota: THREE.Group;
     hoveredId: string | null;
   } | null>(null);
   const onLocalClickRef = useRef(onLocalClick);
@@ -185,7 +188,19 @@ const Map3D: React.FC<Map3DProps> = ({ locais, projetosPorLocal, selectedLocalId
 
     const pins = new THREE.Group();
     scene.add(pins);
-    sceneRef.current = { volumes, pins, hoveredId: null };
+    const rotaGroup = new THREE.Group();
+    scene.add(rotaGroup);
+
+    // Marcador fixo da entrada
+    const e = toScene(ENTRADA.x, ENTRADA.y);
+    const entrada = new THREE.Mesh(
+      new THREE.CylinderGeometry(1.1, 1.1, 0.5, 24),
+      new THREE.MeshStandardMaterial({ color: 0x2563eb })
+    );
+    entrada.position.set(e.x, 0.25, e.z);
+    scene.add(entrada);
+
+    sceneRef.current = { volumes, pins, rota: rotaGroup, hoveredId: null };
     pintar();
 
     // Hover e clique via raycaster
@@ -306,6 +321,30 @@ const Map3D: React.FC<Map3DProps> = ({ locais, projetosPorLocal, selectedLocalId
       ctx.pins.add(pin);
     }
   }, [locais, projetosPorLocal, selectedLocalId, loading]);
+
+  // Rota: tubo azul rente ao chão, da entrada até o local
+  useEffect(() => {
+    const ctx = sceneRef.current;
+    if (!ctx) return;
+    ctx.rota.children.forEach((c) => {
+      const m = c as THREE.Mesh;
+      m.geometry.dispose();
+      (m.material as THREE.Material).dispose();
+    });
+    ctx.rota.clear();
+    if (!rota || rota.pontos.length < 2) return;
+    const caminho = new THREE.CurvePath<THREE.Vector3>();
+    const pts = rota.pontos.map((p) => {
+      const s = toScene(p.x, p.y);
+      return new THREE.Vector3(s.x, 0.6, s.z);
+    });
+    for (let i = 1; i < pts.length; i++) caminho.add(new THREE.LineCurve3(pts[i - 1], pts[i]));
+    const tubo = new THREE.Mesh(
+      new THREE.TubeGeometry(caminho, pts.length * 12, 0.35, 8, false),
+      new THREE.MeshStandardMaterial({ color: 0x2563eb, emissive: 0x1d4ed8, emissiveIntensity: 0.4 })
+    );
+    ctx.rota.add(tubo);
+  }, [rota, loading]);
 
   return (
     <div className="absolute inset-0 overflow-hidden">

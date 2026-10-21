@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo, Suspense, lazy } from "react";
-import { Plus, Minus, RotateCcw, LogOut } from "lucide-react";
+import { Plus, Minus, RotateCcw, LogOut, LogIn, List } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../provider/AuthContext";
 import { api } from "../services/api";
 import type { Project, CreateProjectRequest } from "../types";
 import { type Local, loadLocais, mapToViewBox, MAP_W, MAP_H } from "../locais";
-import ProjectSidebar from "./ProjectSidebar";
+import { type Rota, calcularRota, preCarregarRotas, ENTRADA } from "../rota";
+import Sidebar from "./Sidebar";
 import LocalPanel from "./LocalPanel";
 import ProjectForm from "./ProjectForm";
 import institutoLogo from "../assets/intitutoLogo.png";
@@ -15,7 +16,7 @@ const Map3D = lazy(() => import("./Map3D"));
 
 const MIN_ZOOM = 0.5;
 const MAX_ZOOM = 12;
-const FOCUS_ZOOM = 3.5;
+const FOCUS_ZOOM = 4;
 
 const NewMap: React.FC = () => {
   const navigate = useNavigate();
@@ -30,12 +31,15 @@ const NewMap: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
-  // Seleção e formulários
+  // Seleção, rota e formulários
   const [selectedLocalId, setSelectedLocalId] = useState<string | null>(null);
   const [selectedProjectId, setSelectedProjectId] = useState<number | null>(null);
   const [hoveredLocalId, setHoveredLocalId] = useState<string | null>(null);
+  const [rota, setRota] = useState<Rota | null>(null);
+  const [rotaVisivel, setRotaVisivel] = useState(true);
+  const [calculandoRota, setCalculandoRota] = useState(false);
   const [form, setForm] = useState<{ project: Project | null; localId: string | null } | null>(null);
-  const [sidebarMinimized, setSidebarMinimized] = useState(false);
+  const [listaAberta, setListaAberta] = useState(false); // gaveta no celular
   const [viewMode, setViewMode] = useState<"2d" | "3d">("2d");
 
   // Estados de pan e zoom
@@ -103,15 +107,39 @@ const NewMap: React.FC = () => {
     [commitView]
   );
 
-  // Centraliza a câmera 2D num local
-  const focusLocal = useCallback(
-    (local: Local) => {
-      const c = mapToViewBox(local.centro.x, local.centro.y);
-      const z = Math.max(viewRef.current.zoom, FOCUS_ZOOM);
-      viewRef.current = { zoom: z, pan: { x: 50 - c.x * z, y: 50 - c.y * z } };
+  // Centro visível do mapa no viewBox: desconta o painel do local no desktop
+  const centroVisivel = useCallback(() => {
+    const m = getViewBoxMetrics();
+    if (!m || window.innerWidth < 768) return { x: 50, y: 50 };
+    const painel = 396; // largura do painel + margem, em px
+    const cx = (m.rect.width - painel) / 2;
+    return { x: (cx - m.ox) / m.s, y: 50 };
+  }, [getViewBoxMetrics]);
+
+  // Centraliza a câmera 2D num ponto do mapa (px)
+  const focusPonto = useCallback(
+    (x: number, y: number, z: number) => {
+      const c = mapToViewBox(x, y);
+      const alvo = centroVisivel();
+      viewRef.current = { zoom: z, pan: { x: alvo.x - c.x * z, y: alvo.y - c.y * z } };
       commitView();
     },
-    [commitView]
+    [commitView, centroVisivel]
+  );
+
+  // Enquadra a rota inteira (entrada -> sala)
+  const enquadrarRota = useCallback(
+    (r: Rota) => {
+      const xs = r.pontos.map((p) => p.x);
+      const ys = r.pontos.map((p) => p.y);
+      const a = mapToViewBox(Math.min(...xs), Math.min(...ys));
+      const b = mapToViewBox(Math.max(...xs), Math.max(...ys));
+      const m = getViewBoxMetrics();
+      const largura = m ? (m.rect.width - (window.innerWidth < 768 ? 0 : 396)) / m.s : 100;
+      const z = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, Math.min((largura * 0.8) / (b.x - a.x || 1), 80 / (b.y - a.y || 1))));
+      focusPonto((Math.min(...xs) + Math.max(...xs)) / 2, (Math.min(...ys) + Math.max(...ys)) / 2, z);
+    },
+    [focusPonto, getViewBoxMetrics]
   );
 
   const loadProjects = useCallback(async () => {
@@ -126,6 +154,7 @@ const NewMap: React.FC = () => {
       })
       .catch(() => setError("Erro ao carregar o mapa"))
       .finally(() => setLoading(false));
+    preCarregarRotas();
   }, []);
 
   // Limpar mensagens
@@ -212,24 +241,51 @@ const NewMap: React.FC = () => {
             }).join("L") + "Z"
           : null,
         c: mapToViewBox(l.centro.x, l.centro.y),
+        // contador logo abaixo do nome da sala, sem cobri-lo
+        badge: mapToViewBox(l.centro.x, l.centro.y + (l.poligono ? 62 : 0)),
       })),
     [selecionaveis]
+  );
+  const rotaD = useMemo(
+    () =>
+      rota
+        ? "M" + rota.pontos.map((p) => {
+            const v = mapToViewBox(p.x, p.y);
+            return `${v.x.toFixed(3)},${v.y.toFixed(3)}`;
+          }).join("L")
+        : null,
+    [rota]
   );
 
   const selectedLocal = selectedLocalId ? locaisPorId.get(selectedLocalId) ?? null : null;
 
-  const selectLocal = (local: Local, focus = false) => {
-    setSelectedLocalId(local.id);
-    setSelectedProjectId(null);
-    if (focus) focusLocal(local);
-  };
+  // Seleciona o local, aproxima a câmera e calcula a rota desde a entrada
+  const abrirLocal = useCallback(
+    (local: Local, projectId: number | null) => {
+      setSelectedLocalId(local.id);
+      setSelectedProjectId(projectId);
+      setListaAberta(false);
+      setRotaVisivel(true);
+      focusPonto(local.centro.x, local.centro.y, Math.max(viewRef.current.zoom, FOCUS_ZOOM));
+      setRota(null);
+      setCalculandoRota(true);
+      calcularRota(local)
+        .then((r) => setRota(r))
+        .catch(() => setRota(null))
+        .finally(() => setCalculandoRota(false));
+    },
+    [focusPonto]
+  );
 
   const selectProject = (project: Project) => {
     const local = locaisPorId.get(project.localId);
-    setSelectedProjectId(project.id);
-    if (!local) return;
-    setSelectedLocalId(local.id);
-    focusLocal(local);
+    if (local) abrirLocal(local, project.id);
+  };
+
+  const fecharLocal = () => {
+    setSelectedLocalId(null);
+    setSelectedProjectId(null);
+    setRota(null);
   };
 
   // Handlers de mouse do mapa 2D
@@ -262,10 +318,47 @@ const NewMap: React.FC = () => {
 
   const stopDragging = () => setIsDragging(false);
 
+  // Toque: arrastar com um dedo, pinça com dois
+  const touchRef = useRef<{ dist: number; panX: number; panY: number; x: number; y: number } | null>(null);
+  const handleTouchStart = (e: React.TouchEvent<SVGSVGElement>) => {
+    hasDraggedRef.current = false;
+    const t = e.touches;
+    const x = t.length > 1 ? (t[0].clientX + t[1].clientX) / 2 : t[0].clientX;
+    const y = t.length > 1 ? (t[0].clientY + t[1].clientY) / 2 : t[0].clientY;
+    touchRef.current = {
+      dist: t.length > 1 ? Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY) : 0,
+      panX: viewRef.current.pan.x,
+      panY: viewRef.current.pan.y,
+      x,
+      y,
+    };
+  };
+  const handleTouchMove = (e: React.TouchEvent<SVGSVGElement>) => {
+    const st = touchRef.current;
+    if (!st) return;
+    const t = e.touches;
+    const s = getViewBoxMetrics()?.s ?? 1;
+    if (t.length > 1 && st.dist) {
+      const dist = Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
+      const mx = (t[0].clientX + t[1].clientX) / 2;
+      const my = (t[0].clientY + t[1].clientY) / 2;
+      const p = clientToViewBox(mx, my);
+      zoomAt(dist / st.dist, p.x, p.y);
+      st.dist = dist;
+      hasDraggedRef.current = true;
+      return;
+    }
+    const dx = t[0].clientX - st.x;
+    const dy = t[0].clientY - st.y;
+    if (Math.abs(dx) > 5 || Math.abs(dy) > 5) hasDraggedRef.current = true;
+    viewRef.current = { zoom: viewRef.current.zoom, pan: { x: st.panX + dx / s, y: st.panY + dy / s } };
+    commitView();
+  };
+
   // Clique num local (ignora se o gesto foi um arraste do mapa)
   const handleLocalClick = (local: Local) => {
     if (hasDraggedRef.current) return;
-    selectLocal(local);
+    abrirLocal(local, null);
   };
 
   // Botões aproximam/afastam em torno do centro da tela
@@ -278,12 +371,13 @@ const NewMap: React.FC = () => {
 
   // CRUD de projetos
   const handleSubmitProject = async (data: CreateProjectRequest) => {
+    const rotulo = data.number != null ? `Trabalho #${data.number}` : "Trabalho";
     if (form?.project) {
       await api.updateProject(form.project.id, data);
-      setSuccessMessage(`Trabalho #${data.number} atualizado.`);
+      setSuccessMessage(`${rotulo} atualizado.`);
     } else {
       await api.createProject(data);
-      setSuccessMessage(`Trabalho #${data.number} cadastrado.`);
+      setSuccessMessage(`${rotulo} cadastrado.`);
     }
     setForm(null);
     await loadProjects();
@@ -291,10 +385,11 @@ const NewMap: React.FC = () => {
   };
 
   const handleDeleteProject = async (project: Project) => {
-    if (!confirm(`Excluir o trabalho #${project.number} "${project.title}"?`)) return;
+    const rotulo = project.number != null ? `#${project.number} ` : "";
+    if (!confirm(`Excluir o trabalho ${rotulo}"${project.title}"?`)) return;
     try {
       await api.deleteProject(project.id);
-      setSuccessMessage(`Trabalho #${project.number} excluído.`);
+      setSuccessMessage("Trabalho excluído.");
       await loadProjects();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erro ao excluir trabalho");
@@ -302,29 +397,50 @@ const NewMap: React.FC = () => {
   };
 
   const panelOpen = Boolean(selectedLocal);
+  const entradaVB = mapToViewBox(ENTRADA.x, ENTRADA.y);
+  const rotaNoMapa = rota && rotaVisivel ? rota : null;
+
+  const sidebar = (
+    <Sidebar
+      locais={locais}
+      projetosPorLocal={projetosPorLocal}
+      projects={projects}
+      loading={loading}
+      isAdmin={isAdmin}
+      selectedLocalId={selectedLocalId}
+      selectedProjectId={selectedProjectId}
+      onSelectLocal={(l) => abrirLocal(l, null)}
+      onSelectProject={selectProject}
+      onCreate={() => setForm({ project: null, localId: selectedLocalId })}
+      onClose={() => setListaAberta(false)}
+    />
+  );
 
   return (
-    <div className="h-screen w-full bg-gray-100 flex overflow-hidden relative">
-      <ProjectSidebar
-        projects={projects}
-        loading={loading}
-        isAdmin={isAdmin}
-        minimized={sidebarMinimized}
-        setMinimized={setSidebarMinimized}
-        selectedProjectId={selectedProjectId}
-        onSelect={selectProject}
-        onCreate={() => setForm({ project: null, localId: selectedLocalId })}
-      />
-
-      <div className="absolute inset-0">
-        {/* Alternância 2D / 3D */}
-        <div className="absolute top-4 left-1/2 -translate-x-1/2 z-30 flex bg-white border border-gray-300 rounded-lg shadow-md overflow-hidden text-sm font-medium">
+    <div className="h-[100dvh] w-full flex flex-col bg-gray-100 overflow-hidden">
+      {/* Cabeçalho */}
+      <header className="h-14 flex-shrink-0 flex items-center gap-3 px-3 md:px-4 bg-white border-b border-gray-200 z-40">
+        <button
+          onClick={() => setListaAberta(true)}
+          className="md:hidden p-2 -ml-1 rounded-lg hover:bg-gray-100"
+          aria-label="Abrir lista de trabalhos"
+        >
+          <List className="w-5 h-5 text-gray-700" />
+        </button>
+        <img src={institutoLogo} alt="IF Goiano" className="h-8 w-auto hidden sm:block" />
+        <div className="min-w-0 flex-1">
+          <h1 className="text-sm md:text-base font-semibold text-gray-900 truncate">
+            XXVII Feira de Ciência e Tecnologia
+          </h1>
+          <p className="text-xs text-gray-500 truncate">IF Goiano · Campus Ceres · Mapa dos trabalhos</p>
+        </div>
+        <div className="flex bg-gray-100 rounded-lg p-0.5 text-sm font-medium">
           {(["2d", "3d"] as const).map((mode) => (
             <button
               key={mode}
               onClick={() => setViewMode(mode)}
-              className={`px-3 py-1.5 transition-colors ${
-                viewMode === mode ? "bg-green-600 text-white" : "text-gray-700 hover:bg-gray-50"
+              className={`px-3 py-1 rounded-md transition-colors ${
+                viewMode === mode ? "bg-green-600 text-white shadow" : "text-gray-600 hover:text-gray-900"
               }`}
               aria-pressed={viewMode === mode}
             >
@@ -332,187 +448,248 @@ const NewMap: React.FC = () => {
             </button>
           ))}
         </div>
-
-        {/* Login / sair */}
-        {!panelOpen &&
-          (user ? (
-            <button
-              onClick={() => {
-                logout();
-                navigate("/");
-              }}
-              className="absolute top-4 right-4 z-30 flex items-center gap-2 px-3 py-2 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 rounded-lg shadow-md text-sm"
-              title="Sair"
-            >
-              <LogOut className="w-4 h-4" /> Sair
-            </button>
-          ) : (
-            <img
-              src={institutoLogo}
-              alt="Logo Instituto"
-              onDoubleClick={() => navigate("/login")}
-              className="absolute top-4 right-4 z-30 h-10 w-auto cursor-pointer hover:opacity-80 transition-opacity"
-              title="Duplo clique para fazer login"
-            />
-          ))}
-
-        {/* Mensagens */}
-        {(successMessage || error) && (
-          <div
-            className={`absolute bottom-6 left-1/2 -translate-x-1/2 z-50 px-4 py-2.5 rounded-lg shadow-lg text-sm font-medium text-white ${
-              error ? "bg-red-500" : "bg-green-600"
-            }`}
-            role="status"
-          >
-            {error ?? successMessage}
-          </div>
-        )}
-
-        {viewMode === "3d" && (
-          <div className="absolute inset-0 z-20 bg-white">
-            <Suspense
-              fallback={
-                <div className="absolute inset-0 flex items-center justify-center text-sm text-gray-600">
-                  Carregando visão 3D…
-                </div>
-              }
-            >
-              <Map3D
-                locais={locais}
-                projetosPorLocal={projetosPorLocal}
-                selectedLocalId={selectedLocalId}
-                onLocalClick={(l) => selectLocal(l)}
-              />
-            </Suspense>
-          </div>
-        )}
-
-        {/* Controles de zoom */}
-        <div
-          className={`absolute bottom-6 z-10 flex flex-col gap-2 transition-[right] ${
-            panelOpen ? "right-[392px]" : "right-6"
-          } ${viewMode === "3d" ? "hidden" : ""}`}
-        >
-          <button onClick={zoomIn} className="bg-white border border-gray-300 rounded-lg p-2 shadow-md hover:bg-gray-50" title="Aproximar">
-            <Plus className="w-5 h-5 text-gray-700" />
-          </button>
-          <button onClick={zoomOut} className="bg-white border border-gray-300 rounded-lg p-2 shadow-md hover:bg-gray-50" title="Afastar">
-            <Minus className="w-5 h-5 text-gray-700" />
-          </button>
-          <button onClick={resetView} className="bg-white border border-gray-300 rounded-lg p-2 shadow-md hover:bg-gray-50" title="Ver mapa inteiro">
-            <RotateCcw className="w-5 h-5 text-gray-700" />
-          </button>
-          <div className="bg-white border border-gray-300 rounded-lg px-2 py-1.5 shadow-md text-xs text-gray-600 text-center">
-            {(zoom * 100).toFixed(0)}%
-          </div>
-        </div>
-
-        {/* Mapa base como <img>: composto na GPU, posicionado pelo efeito de zoom/pan */}
-        <div className="absolute inset-0 overflow-hidden bg-white pointer-events-none">
-          <img
-            ref={mapImgRef}
-            src={`${import.meta.env.BASE_URL}mapa/mapa-feira-2026.svg`}
-            alt="Mapa da feira"
-            draggable={false}
-            className="absolute left-0 top-0 max-w-none select-none"
-            style={{ transformOrigin: "0 0" }}
-          />
-        </div>
-
-        {/* Camada interativa: locais clicáveis por cima do mapa */}
-        <svg
-          ref={svgRef}
-          className={`absolute inset-0 w-full h-full ${isDragging ? "cursor-grabbing" : "cursor-grab"}`}
-          viewBox="0 0 100 100"
-          preserveAspectRatio="xMidYMid meet"
-          onMouseDown={handleMouseDown}
-          onMouseMove={handleMouseMove}
-          onMouseUp={stopDragging}
-          onMouseLeave={stopDragging}
-          onContextMenu={(e) => e.preventDefault()}
-          style={{ userSelect: "none" }}
-        >
-          <g transform={`translate(${pan.x}, ${pan.y}) scale(${zoom})`}>
-            {formas.map(({ local, d }) => {
-              if (!d) return null;
-              const temProjetos = projetosPorLocal.has(local.id);
-              const ativo = local.id === selectedLocalId;
-              const hover = local.id === hoveredLocalId;
-              return (
-                <path
-                  key={local.id}
-                  d={d}
-                  fill={ativo ? "#16a34a" : temProjetos ? "#22c55e" : hover ? "#3b82f6" : "transparent"}
-                  fillOpacity={ativo ? 0.35 : temProjetos ? 0.18 : hover ? 0.15 : 0}
-                  stroke={ativo ? "#15803d" : hover ? "#2563eb" : "none"}
-                  strokeWidth={2}
-                  vectorEffect="non-scaling-stroke"
-                  className="cursor-pointer"
-                  onMouseEnter={() => setHoveredLocalId(local.id)}
-                  onMouseLeave={() => setHoveredLocalId((h) => (h === local.id ? null : h))}
-                  onClick={() => handleLocalClick(local)}
-                >
-                  <title>{local.bloco ? `Bloco ${local.bloco} · ${local.nome}` : local.nome}</title>
-                </path>
-              );
-            })}
-
-            {/* Contagem de trabalhos por local; locais pontuais viram marcador */}
-            {formas.map(({ local, c, d }) => {
-              const n = projetosPorLocal.get(local.id)?.length ?? 0;
-              if (!n && d) return null;
-              const r = (n ? 1.4 : 0.8) / zoom;
-              const ativo = local.id === selectedLocalId;
-              return (
-                <g
-                  key={`m-${local.id}`}
-                  className="cursor-pointer"
-                  onClick={() => handleLocalClick(local)}
-                >
-                  <title>{local.nome}</title>
-                  <circle
-                    cx={c.x}
-                    cy={c.y}
-                    r={r}
-                    fill={n ? (ativo ? "#15803d" : "#16a34a") : "#6b7280"}
-                    stroke="#fff"
-                    strokeWidth={0.25 / zoom}
-                  />
-                  {n > 0 && (
-                    <text
-                      x={c.x}
-                      y={c.y}
-                      textAnchor="middle"
-                      dominantBaseline="central"
-                      fontSize={1.5 / zoom}
-                      fontWeight={700}
-                      fill="#fff"
-                      pointerEvents="none"
-                    >
-                      {n}
-                    </text>
-                  )}
-                </g>
-              );
-            })}
-          </g>
-        </svg>
-
-        {selectedLocal && (
-          <LocalPanel
-            local={selectedLocal}
-            projects={projetosPorLocal.get(selectedLocal.id) ?? []}
-            selectedProjectId={selectedProjectId}
-            isAdmin={isAdmin}
-            onClose={() => {
-              setSelectedLocalId(null);
-              setSelectedProjectId(null);
+        {user ? (
+          <button
+            onClick={() => {
+              logout();
+              navigate("/");
             }}
-            onAddProject={() => setForm({ project: null, localId: selectedLocal.id })}
-            onEditProject={(p) => setForm({ project: p, localId: p.localId })}
-            onDeleteProject={handleDeleteProject}
-          />
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-sm text-gray-700 hover:bg-gray-100"
+            title="Sair"
+          >
+            <LogOut className="w-4 h-4" /> <span className="hidden sm:inline">Sair</span>
+          </button>
+        ) : (
+          <button
+            onClick={() => navigate("/login")}
+            className="p-2 rounded-lg text-gray-500 hover:bg-gray-100"
+            title="Entrar (organização)"
+          >
+            <LogIn className="w-4 h-4" />
+          </button>
         )}
+      </header>
+
+      <div className="flex-1 flex min-h-0 relative">
+        {/* Lista: coluna fixa no desktop, gaveta no celular */}
+        <div className="hidden md:block w-[360px] flex-shrink-0 border-r border-gray-200 z-30">{sidebar}</div>
+        {listaAberta && (
+          <div className="md:hidden absolute inset-0 z-50 flex">
+            <div className="w-[88%] max-w-sm h-full shadow-2xl">{sidebar}</div>
+            <button className="flex-1 bg-black/30" onClick={() => setListaAberta(false)} aria-label="Fechar lista" />
+          </div>
+        )}
+
+        {/* Área do mapa */}
+        <div className="flex-1 relative min-w-0">
+          {(successMessage || error) && (
+            <div
+              className={`absolute top-4 left-1/2 -translate-x-1/2 z-50 px-4 py-2.5 rounded-lg shadow-lg text-sm font-medium text-white ${
+                error ? "bg-red-500" : "bg-green-600"
+              }`}
+              role="status"
+            >
+              {error ?? successMessage}
+            </div>
+          )}
+
+          {viewMode === "3d" && (
+            <div className="absolute inset-0 z-20 bg-white">
+              <Suspense
+                fallback={
+                  <div className="absolute inset-0 flex items-center justify-center text-sm text-gray-600">
+                    Carregando visão 3D…
+                  </div>
+                }
+              >
+                <Map3D
+                  locais={locais}
+                  projetosPorLocal={projetosPorLocal}
+                  selectedLocalId={selectedLocalId}
+                  rota={rotaNoMapa}
+                  onLocalClick={(l) => abrirLocal(l, null)}
+                />
+              </Suspense>
+            </div>
+          )}
+
+          {/* Controles de zoom */}
+          <div
+            className={`absolute bottom-6 z-10 flex flex-col gap-2 ${
+              panelOpen ? "right-4 md:right-[400px] max-md:hidden" : "right-4"
+            } ${viewMode === "3d" ? "hidden" : ""}`}
+          >
+            <button onClick={zoomIn} className="bg-white border border-gray-300 rounded-lg p-2 shadow-md hover:bg-gray-50" title="Aproximar">
+              <Plus className="w-5 h-5 text-gray-700" />
+            </button>
+            <button onClick={zoomOut} className="bg-white border border-gray-300 rounded-lg p-2 shadow-md hover:bg-gray-50" title="Afastar">
+              <Minus className="w-5 h-5 text-gray-700" />
+            </button>
+            <button onClick={resetView} className="bg-white border border-gray-300 rounded-lg p-2 shadow-md hover:bg-gray-50" title="Ver mapa inteiro">
+              <RotateCcw className="w-5 h-5 text-gray-700" />
+            </button>
+          </div>
+
+          {/* Legenda */}
+          {viewMode === "2d" && (
+            <div className="absolute bottom-6 left-4 z-10 bg-white/95 border border-gray-200 rounded-lg shadow px-3 py-2 text-xs text-gray-700 space-y-1 max-md:hidden">
+              <p className="flex items-center gap-2">
+                <span className="w-3 h-3 rounded-sm bg-green-500/40 border border-green-600" /> Local com trabalhos
+              </p>
+              <p className="flex items-center gap-2">
+                <span className="w-3 h-0.5 bg-blue-600" /> Rota a partir da entrada
+              </p>
+            </div>
+          )}
+
+          {/* Mapa base como <img>: composto na GPU, posicionado pelo efeito de zoom/pan */}
+          <div className="absolute inset-0 overflow-hidden bg-white pointer-events-none">
+            <img
+              ref={mapImgRef}
+              src={`${import.meta.env.BASE_URL}mapa/mapa-feira-2026.svg`}
+              alt="Mapa da feira"
+              draggable={false}
+              className="absolute left-0 top-0 max-w-none select-none"
+              style={{ transformOrigin: "0 0" }}
+            />
+          </div>
+
+          {/* Camada interativa: locais clicáveis e rota por cima do mapa */}
+          <svg
+            ref={svgRef}
+            className={`absolute inset-0 w-full h-full touch-none ${isDragging ? "cursor-grabbing" : "cursor-grab"}`}
+            viewBox="0 0 100 100"
+            preserveAspectRatio="xMidYMid meet"
+            onMouseDown={handleMouseDown}
+            onMouseMove={handleMouseMove}
+            onMouseUp={stopDragging}
+            onMouseLeave={stopDragging}
+            onTouchStart={handleTouchStart}
+            onTouchMove={handleTouchMove}
+            onTouchEnd={() => (touchRef.current = null)}
+            onContextMenu={(e) => e.preventDefault()}
+            style={{ userSelect: "none" }}
+          >
+            <g transform={`translate(${pan.x}, ${pan.y}) scale(${zoom})`}>
+              {formas.map(({ local, d }) => {
+                if (!d) return null;
+                const temProjetos = projetosPorLocal.has(local.id);
+                const ativo = local.id === selectedLocalId;
+                const hover = local.id === hoveredLocalId;
+                return (
+                  <path
+                    key={local.id}
+                    d={d}
+                    fill={ativo ? "#16a34a" : hover ? "#3b82f6" : temProjetos ? "#22c55e" : "transparent"}
+                    fillOpacity={ativo ? 0.4 : hover ? 0.2 : temProjetos ? 0.16 : 0}
+                    stroke={ativo ? "#15803d" : hover ? "#2563eb" : "none"}
+                    strokeWidth={2}
+                    vectorEffect="non-scaling-stroke"
+                    className="cursor-pointer"
+                    onMouseEnter={() => setHoveredLocalId(local.id)}
+                    onMouseLeave={() => setHoveredLocalId((h) => (h === local.id ? null : h))}
+                    onClick={() => handleLocalClick(local)}
+                  >
+                    <title>{local.bloco ? `Bloco ${local.bloco} · ${local.nome}` : local.nome}</title>
+                  </path>
+                );
+              })}
+
+              {/* Rota: traço branco por baixo e azul animado por cima */}
+              {rotaNoMapa && rotaD && (
+                <g pointerEvents="none">
+                  <path d={rotaD} fill="none" stroke="#fff" strokeWidth={9} strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
+                  <path d={rotaD} fill="none" stroke="#2563eb" strokeWidth={5} strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
+                  <path
+                    d={rotaD}
+                    fill="none"
+                    stroke="#bfdbfe"
+                    strokeWidth={2}
+                    strokeDasharray="2 14"
+                    strokeLinecap="round"
+                    vectorEffect="non-scaling-stroke"
+                    className="rota-anim"
+                  />
+                </g>
+              )}
+
+              {/* Contagem de trabalhos por local; locais pontuais viram marcador */}
+              {formas.map(({ local, badge: c, d }) => {
+                const n = projetosPorLocal.get(local.id)?.length ?? 0;
+                if (!n && d) return null;
+                const r = (n ? 1.4 : 0.8) / zoom;
+                const ativo = local.id === selectedLocalId;
+                return (
+                  <g key={`m-${local.id}`} className="cursor-pointer" onClick={() => handleLocalClick(local)}>
+                    <title>{local.nome}</title>
+                    <circle
+                      cx={c.x}
+                      cy={c.y}
+                      r={r}
+                      fill={n ? (ativo ? "#15803d" : "#16a34a") : "#6b7280"}
+                      stroke="#fff"
+                      strokeWidth={0.25 / zoom}
+                    />
+                    {n > 0 && (
+                      <text
+                        x={c.x}
+                        y={c.y}
+                        textAnchor="middle"
+                        dominantBaseline="central"
+                        fontSize={1.5 / zoom}
+                        fontWeight={700}
+                        fill="#fff"
+                        pointerEvents="none"
+                      >
+                        {n}
+                      </text>
+                    )}
+                  </g>
+                );
+              })}
+
+              {/* Entrada da feira */}
+              <g pointerEvents="none">
+                <circle cx={entradaVB.x} cy={entradaVB.y} r={1.3 / zoom} fill="#2563eb" stroke="#fff" strokeWidth={0.3 / zoom} />
+                <text
+                  x={entradaVB.x}
+                  y={entradaVB.y - 2.2 / zoom}
+                  textAnchor="middle"
+                  fontSize={1.6 / zoom}
+                  fontWeight={700}
+                  fill="#1e3a8a"
+                  stroke="#fff"
+                  strokeWidth={0.5 / zoom}
+                  paintOrder="stroke"
+                >
+                  Entrada
+                </text>
+              </g>
+            </g>
+          </svg>
+
+          {selectedLocal && (
+            <LocalPanel
+              local={selectedLocal}
+              projects={projetosPorLocal.get(selectedLocal.id) ?? []}
+              selectedProjectId={selectedProjectId}
+              isAdmin={isAdmin}
+              rota={rota}
+              rotaVisivel={rotaVisivel}
+              calculandoRota={calculandoRota}
+              onToggleRota={() => {
+                const mostrar = !rotaVisivel;
+                setRotaVisivel(mostrar);
+                if (mostrar && rota) enquadrarRota(rota);
+              }}
+              onVerRota={() => rota && enquadrarRota(rota)}
+              onClose={fecharLocal}
+              onAddProject={() => setForm({ project: null, localId: selectedLocal.id })}
+              onEditProject={(p) => setForm({ project: p, localId: p.localId })}
+              onDeleteProject={handleDeleteProject}
+            />
+          )}
+        </div>
       </div>
 
       {form && (
