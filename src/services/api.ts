@@ -9,7 +9,8 @@ import type {
   CreateProjectRequest,
   UpdateProjectRequest,
 } from "../types";
-const API_BASE_URL = "https://api-sismap-api.i5mfns.easypanel.host";
+const API_BASE_URL =
+  import.meta.env.VITE_API_URL || "https://api-sismap-api.i5mfns.easypanel.host";
 
 const getAuthHeaders = () => {
   const token = localStorage.getItem("authToken");

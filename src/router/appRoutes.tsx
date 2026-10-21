@@ -15,7 +15,7 @@ const AppRoutes: React.FC = () => {
   const { user, isAuthenticated } = useAuth();
 
   return (
-    <Router>
+    <Router basename={import.meta.env.BASE_URL}>
       <Routes>
         {/* Rota principal - Mapa Interativo (pública - todos podem visualizar) */}
         <Route path="/" element={<NewMap />} />

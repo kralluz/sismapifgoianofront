@@ -134,7 +134,7 @@ const MapCanvas: React.FC<MapCanvasProps> = ({
         <g transform={`translate(${pan.x}, ${pan.y}) scale(${zoom})`}>
           {/* Imagem do mapa como fundo */}
           <image
-            href="/mapa/mapa.jpg"
+            href={`${import.meta.env.BASE_URL}mapa/mapa.jpg`}
             x="0"
             y="0"
             width="100"
